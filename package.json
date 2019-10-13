@@ -1,0 +1,28 @@
+{
+  "private": true,
+  "name": "jukebox",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "echo 'We need to setup ava first'",
+    "run": "echo 'We need to finish raknet and binarystream first'",
+    "build": "oao all tsc",
+    "watch": "oao all \"tsc -w\"",
+    "status": "oao status"
+  },
+  "devDependencies": {
+    "ava": "2.4.0",
+    "husky": "3.0.9",
+    "oao": "1.7.0",
+    "prettier": "1.18.2",
+    "pretty-quick": "2.0.0",
+    "ts-node": "8.4.1",
+    "typescript": "3.6.4"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "pretty-quick --staged"
+    }
+  }
+}
