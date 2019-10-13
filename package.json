@@ -8,7 +8,7 @@
     "test": "echo 'We need to setup ava first'",
     "run": "echo 'We need to finish raknet and binarystream first'",
     "build": "oao all tsc",
-    "watch": "oao all \"tsc -w\"",
+    "watch": "oao all --parallel \"tsc -w\"",
     "status": "oao status"
   },
   "devDependencies": {
