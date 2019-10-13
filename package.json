@@ -8,10 +8,11 @@
     "test": "echo 'We need to setup ava first'",
     "run": "echo 'We need to finish raknet and binarystream first'",
     "build": "oao all tsc",
-    "watch": "oao all --parallel \"tsc -w\"",
+    "watch": "oao all --parallel \"tsc -w --preserveWatchOutput\"",
     "status": "oao status"
   },
   "devDependencies": {
+    "@types/node": "12.7.12",
     "ava": "2.4.0",
     "husky": "3.0.9",
     "oao": "1.7.0",
