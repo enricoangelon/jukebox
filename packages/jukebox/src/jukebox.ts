@@ -21,7 +21,7 @@ export class Jukebox {
 
   public start() {
     // TODO: Implement bootstrapping
-    //let int = new UDPRakNetInterface(19132);
+    let int = new UDPRakNetInterface(19132)
     //TODO: interface that starts SessionsManager and RakNet packet listening.
     //TODO: SessionManager will handle packets per session.
   }
