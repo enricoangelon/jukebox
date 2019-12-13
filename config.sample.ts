@@ -14,6 +14,6 @@ export default {
   plugins: [],
   server: {
     port: 19132,
-    motd: 'A jukebox minecraft bedrock server',
+    motd: 'A jukebox Minecraft Bedrock server',
   },
 }
