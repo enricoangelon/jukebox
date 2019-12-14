@@ -2,6 +2,11 @@
   "name": "@jukebox/core",
   "description": "Modular Minecraft: Bedrock edition server",
   "version": "0.0.1",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "license": "MIT",
-  "author": "Jukebox authors"
+  "author": "Jukebox authors",
+  "dependencies": {
+    "@jukebox/raknet": "0.0.1"
+  }
 }

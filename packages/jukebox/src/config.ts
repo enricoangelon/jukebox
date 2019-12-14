@@ -6,4 +6,5 @@ export interface Config {
   logger?: Logger
   server?: ServerConfig
   worlds?: WorldGenerator[]
+  lang?: string
 }

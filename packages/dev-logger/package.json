@@ -1,9 +1,9 @@
 {
-  "name": "@jukebox/raknet",
+  "name": "@jukebox/dev-logger",
   "version": "0.0.1",
+  "license": "MIT",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
-  "license": "MIT",
   "author": "Jukebox authors",
   "dependencies": {
     "@jukebox/core": "0.0.1"
