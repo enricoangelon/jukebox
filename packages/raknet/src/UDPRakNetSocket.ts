@@ -5,15 +5,14 @@ export class UDPRakNetSocket {
   private static socket: Socket
 
   constructor() {
-    //TODO: output errors with logger instance
     UDPRakNetSocket.socket = createSocket('udp4').on('error', err => {
-      console.log(err.message)
+      Jukebox.getLogger().fatal(`Could not listen on :${port}`, err)
       UDPRakNetSocket.socket.close()
     })
 
     const { port } = Jukebox.getConfig().server
     UDPRakNetSocket.socket.bind(port, function() {
-      console.log(`Socket bind on: 0.0.0.0:${port}.`)
+      Jukebox.getLogger().info(`Listening on :${port}.`)
     })
 
     UDPRakNetSocket.socket.on('message', function(
