@@ -1,9 +1,8 @@
 import { Config } from './config'
-import { UDPRakNetInterface } from '../../raknet/src/UDPRakNetInterface'
 
 export class Jukebox {
   private static instance: Jukebox
-  private readonly config: Required<Config>
+  private config: Required<Config>
 
   constructor(config: Required<Config>) {
     if (Jukebox.instance) {
@@ -21,9 +20,6 @@ export class Jukebox {
 
   public start() {
     // TODO: Implement bootstrapping
-    let int = new UDPRakNetInterface(19132)
-    //TODO: interface that starts SessionsManager and RakNet packet listening.
-    //TODO: SessionManager will handle packets per session.
   }
 
   public shutdown() {

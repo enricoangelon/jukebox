@@ -4,7 +4,7 @@
     "module": "commonjs",
     "declaration": true,
     "declarationMap": true,
-    "tsBuildInfoFile": "../.tsBuildInfo",
+    "tsBuildInfoFile": "../.tsbuildinfo",
     "sourceMap": true,
     "strict": true,
     "composite": true

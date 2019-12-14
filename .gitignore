@@ -1,15 +1,3 @@
 node_modules
 packages/*/lib
 .tsbuildinfo
-
-# IntelliJ/WebStorm
-.idea/*iwl
-.idea/vcs.xml
-.idea/misc.xml
-.idea/workspace.xml
-.idea/tasks.xml
-.idea/dictionaries/*.xml
-.idea/typescript-compiler.xml
-.idea/discord.xml
-.idea/*
-.idea
