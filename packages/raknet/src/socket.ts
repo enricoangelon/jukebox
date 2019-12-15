@@ -2,7 +2,6 @@ import { Jukebox } from '@jukebox/core'
 import { createSocket, RemoteInfo, Socket as DSocket } from 'dgram'
 import { BinaryStream } from '@jukebox/binarystream'
 import { Identifiers } from './identifiers'
-import { PassThrough } from 'stream'
 
 export class Socket {
   private static socket: DSocket
@@ -24,10 +23,6 @@ export class Socket {
         `Recived a packet from ${rinfo.address}:${rinfo.port} with id: ${pid} and lentgh of ${msg.length}!`
       )
 
-      //se fixi errore lo starto e testo se riceve pacchetti con id giusto
-      // l'errore e' fixato, fai watch e dovrebbe andare
-      //buono ora starto
-      //async senza session e' inutile
       //Those packets don't need a session
       switch (pid) {
         case Identifiers.ID_UNCONNECTED_PING:

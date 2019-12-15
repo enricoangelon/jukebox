@@ -1,4 +1,4 @@
 node_modules
 packages/*/lib
 .tsbuildinfo
-config.sampel.js
+config.sample.js
