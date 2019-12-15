@@ -2,5 +2,7 @@
   "name": "@jukebox/binarystream",
   "version": "0.0.1",
   "license": "MIT",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "author": "Jukebox authors"
 }

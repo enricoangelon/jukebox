@@ -8,4 +8,8 @@ export class BinaryStream {
 
     this.buffer = buffer
   }
+
+  public getBuffer(): Buffer {
+    return this.buffer
+  }
 }

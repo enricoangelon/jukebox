@@ -1,5 +1,5 @@
 import { Config } from './config'
-import { UDPRakNetSocket } from '@jukebox/raknet'
+import { Socket } from '@jukebox/raknet'
 import { resolve } from 'path'
 
 export class Jukebox {
@@ -19,7 +19,7 @@ export class Jukebox {
   }
 
   public start() {
-    new UDPRakNetSocket()
+    new Socket()
 
     // TODO: Implement bootstrapping
   }
