@@ -2,6 +2,7 @@ import { Jukebox } from '@jukebox/core'
 import { createSocket, RemoteInfo, Socket as DSocket } from 'dgram'
 import { BinaryStream } from '@jukebox/binarystream'
 import { Identifiers } from './identifiers'
+import { UnconnectedPong } from './packets/unconnected-pong'
 
 export class Socket {
   private static socket: DSocket
@@ -26,7 +27,17 @@ export class Socket {
       //Those packets don't need a session
       switch (pid) {
         case Identifiers.ID_UNCONNECTED_PING:
-          //todo: prepare buffer to handle this packet
+          let packet = new UnconnectedPong()
+          packet.pingID = buffer.getLong()
+          packet.serverID = Math.floor(Math.random() * 99999999 + 1)
+          Jukebox.getLogger().debug(packet.pingID, packet.serverID)
+          packet.encode()
+          Socket.sendBuffer(
+            packet.stream.getBuffer(),
+            rinfo.port,
+            rinfo.address
+          )
+          Jukebox.getLogger().debug('UnconnectedPong handled!')
           break
         case Identifiers.ID_OPEN_CONNECTION_REQUEST_1:
           //praticamente, da questo pacchetto viene creata una sessione per il client
