@@ -25,6 +25,7 @@ export class Socket {
       )
 
       //Those packets don't need a session
+      //TODO: something like: Identifiers.get(pid).encode()
       switch (pid) {
         case Identifiers.ID_UNCONNECTED_PING:
           let packet = new UnconnectedPong()
@@ -32,11 +33,7 @@ export class Socket {
           packet.serverID = Math.floor(Math.random() * 99999999 + 1)
           Jukebox.getLogger().debug(packet.pingID, packet.serverID)
           packet.encode()
-          Socket.sendBuffer(
-            packet.stream.getBuffer(),
-            rinfo.port,
-            rinfo.address
-          )
+          Socket.sendBuffer(packet.getBuffer(), rinfo.port, rinfo.address)
           Jukebox.getLogger().debug('UnconnectedPong handled!')
           break
         case Identifiers.ID_OPEN_CONNECTION_REQUEST_1:

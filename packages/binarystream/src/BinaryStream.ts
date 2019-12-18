@@ -12,7 +12,7 @@ export class BinaryStream {
   }
 
   public getByte() {
-    return this.buffer.readUInt8(1) //or maybe 0, it should theorically be 0
+    return this.buffer.readUInt8(0) //or maybe 0, it should theorically be 0
   }
 
   public putByte(v: number): void {
