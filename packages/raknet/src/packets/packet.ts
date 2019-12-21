@@ -1,9 +1,10 @@
 import { BinaryStream } from '@jukebox/binarystream'
-import { IPacket } from './i-packet'
 
-export class Packet implements IPacket {
+export class Packet {
   protected stream: BinaryStream
   public pid: number
+
+  //USUAL PACKET FORMAT: xx 00 00 00 00 where xx is pid
 
   constructor(id: number, stream?: BinaryStream) {
     if (!stream) {
@@ -12,13 +13,6 @@ export class Packet implements IPacket {
 
     this.stream = stream
     this.pid = id
-  }
-
-  decode(): void {
-    throw new Error('Method not implemented.')
-  }
-  encode(): void {
-    throw new Error('Method not implemented.')
   }
 
   public getBuffer(): Buffer {

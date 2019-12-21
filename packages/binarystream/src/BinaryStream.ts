@@ -12,15 +12,19 @@ export class BinaryStream {
   }
 
   public getByte() {
-    return this.buffer.readUInt8(0) //or maybe 0, it should theorically be 0
+    //return this.buffer.readUInt8(0) //or maybe 0, it should theorically be 0
+    return this.buffer[this.increaseOffset(1)]
   }
 
   public putByte(v: number): void {
-    Buffer.concat([this.buffer, Buffer.from([v & 0xff])])
+    this.append(Buffer.from([v & 0xff]))
   }
 
   public getLong() {
-    return this.buffer.readUInt32LE(0) + (this.buffer.readUInt32LE(4) << 8)
+    return (
+      (this.buffer.readUInt32BE(this.increaseOffset(4)) << 8) +
+      this.buffer.readUInt32BE(this.increaseOffset(4))
+    )
   }
 
   //STE FUNZIONI NON SONO OTTIMIZZATE E SONO PRESE DA POCKETNODE; SERVONO SOLO PER TESTARE; POI VERRANNO SOSTITUITE
@@ -30,7 +34,7 @@ export class BinaryStream {
     let buf = Buffer.alloc(8)
     buf.writeUInt32BE(~~(v / MAX_UINT32), 0)
     buf.writeUInt32BE(v & MAX_UINT32, 4)
-    Buffer.concat([this.buffer, buf])
+    this.append(buf)
   }
 
   //getShort
@@ -38,11 +42,20 @@ export class BinaryStream {
   putShort(v: number) {
     let buf = Buffer.alloc(2)
     buf.writeUInt16BE(v, 0)
-    Buffer.concat([this.buffer, buf])
+    this.append(buf)
   }
 
   putString(v: string) {
-    Buffer.concat([this.buffer, Buffer.from(v, 'utf8')])
+    this.append(Buffer.from(v, 'utf8'))
+  }
+
+  append(buffer: Buffer) {
+    this.buffer = Buffer.concat([this.buffer, buffer])
+    this.offset += buffer.length
+  }
+
+  increaseOffset(v: number) {
+    return (this.offset += v) - v
   }
 
   public getBuffer(): Buffer {

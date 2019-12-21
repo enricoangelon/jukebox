@@ -1,3 +1,6 @@
 export { Socket } from './socket'
 export { Utils } from './utils'
 export { Identifiers } from './identifiers'
+export { IPacket } from './packets/i-packet'
+export { UnconnectedPong } from './packets/unconnected-pong'
+export { Packet } from './packets/packet'
