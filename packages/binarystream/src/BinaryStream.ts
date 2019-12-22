@@ -1,6 +1,8 @@
+import { Utils } from '@Jukebox/raknet'
+
 export class BinaryStream {
   private buffer: Buffer
-  private offset: number
+  public offset: number
 
   constructor(buffer?: Buffer) {
     if (!buffer) {
@@ -37,7 +39,9 @@ export class BinaryStream {
     this.append(buf)
   }
 
-  //getShort
+  getShort() {
+    return this.buffer.readUInt16BE(this.increaseOffset(2))
+  }
 
   putShort(v: number) {
     let buf = Buffer.alloc(2)
@@ -47,6 +51,14 @@ export class BinaryStream {
 
   putString(v: string) {
     this.append(Buffer.from(v, 'utf8'))
+  }
+
+  getMagic() {
+    return this.buffer.slice(this.offset, (this.offset += 16))
+  }
+
+  putMagic() {
+    this.append(Buffer.from(Utils.magic, 'binary'))
   }
 
   append(buffer: Buffer) {

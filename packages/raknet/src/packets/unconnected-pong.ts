@@ -2,6 +2,7 @@ import { Packet } from './packet'
 import { BinaryStream } from '@jukebox/binarystream'
 import { Utils } from '../utils'
 import { IPacket } from './i-packet'
+import { Identifiers } from '../identifiers'
 
 export class UnconnectedPong extends Packet implements IPacket {
   public serverName: string = ''
@@ -9,16 +10,16 @@ export class UnconnectedPong extends Packet implements IPacket {
   public serverID: number = -1
 
   constructor(stream?: BinaryStream) {
-    super(0x1c, stream)
+    super(Identifiers.ID_UNCONNECTED_PONG, stream)
   }
 
   decode() {}
 
   encode() {
-    this.stream.putByte(this.pid) //packetID, da mandare in ogni pacchetto, infatti credo sia meglio metterlo nell'encode, poi si vedra'
+    this.stream.putByte(this.pid)
     this.stream.putLong(this.pingID)
     this.stream.putLong(this.serverID)
-    this.stream.append(Buffer.from(Utils.magic, 'binary'))
+    this.stream.putMagic()
     this.stream.putShort(this.serverName.length)
     this.stream.putString(this.serverName)
   }

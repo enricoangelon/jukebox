@@ -3,6 +3,8 @@ import { createSocket, RemoteInfo, Socket as DSocket } from 'dgram'
 import { BinaryStream } from '@jukebox/binarystream'
 import { Identifiers } from './identifiers'
 import { UnconnectedPong } from './packets/unconnected-pong'
+import { OpenConnectionReply1 } from './packets/open-connection-reply-1'
+import { OpenConnectionReply2 } from './packets/open-connection-reply-2'
 
 export class Socket {
   private static socket: DSocket
@@ -43,9 +45,10 @@ export class Socket {
       //Those packets don't need a session
       //TODO: something like: Identifiers.get(pid).encode()
       const { motd, maxPlayers } = Jukebox.getConfig().server
+      let packet
       switch (pid) {
         case Identifiers.ID_UNCONNECTED_PING:
-          let packet = new UnconnectedPong()
+          packet = new UnconnectedPong()
           packet.serverName = `MCPE;${motd};389;1.14.1;0;${maxPlayers};${Jukebox.getServerID()};Jukebox;Creative`
           packet.pingID = buffer.getLong()
           packet.serverID = Jukebox.getServerID()
@@ -53,9 +56,20 @@ export class Socket {
           Socket.sendBuffer(packet.getBuffer(), rinfo.port, rinfo.address)
           break
         case Identifiers.ID_OPEN_CONNECTION_REQUEST_1:
-          Jukebox.getLogger().debug('Got open connection')
-          //praticamente, da questo pacchetto viene creata una sessione per il client
+          packet = new OpenConnectionReply1()
+          packet.serverID = Jukebox.getServerID()
+          packet.serverSecurity = 0 //always 0 as https://wiki.vg/Pocket_Minecraft_Protocol#0x06
+          packet.mtuSize = buffer.getShort()
+          packet.encode()
+          Socket.sendBuffer(packet.getBuffer(), rinfo.port, rinfo.address)
           break
+        case Identifiers.ID_OPEN_CONNECTION_REQUEST_2:
+          packet = new OpenConnectionReply2()
+          packet.serverID = Jukebox.getServerID()
+          packet.clientPort = rinfo.port
+          packet.mtuSize = buffer.getShort()
+          packet.encode()
+          Socket.sendBuffer(packet.getBuffer(), rinfo.port, rinfo.address)
       }
     })
   }
