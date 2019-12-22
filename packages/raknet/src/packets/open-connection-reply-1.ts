@@ -11,11 +11,15 @@ export default class OpenConnectionReply1 extends Packet implements IPacket {
   public serverSecurity: number
   public mtuSize: number
 
-  constructor(rinfo: RemoteInfo, stream?: BinaryStream) {
-    super(rinfo, stream)
+  constructor(
+    rinfo: RemoteInfo,
+    inputStream: BinaryStream,
+    stream?: BinaryStream
+  ) {
+    super(rinfo, inputStream, stream)
 
     this.serverSecurity = 0 //always 0 according to https://wiki.vg/Pocket_Minecraft_Protocol#0x06
-    this.mtuSize = this.stream.getShort()
+    this.mtuSize = this.inputStream.getShort()
     this.serverID = Jukebox.serverID
   }
 

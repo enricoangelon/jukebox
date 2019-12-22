@@ -11,14 +11,18 @@ export default class UnconnectedPong extends Packet implements IPacket {
   public pingID: number
   public serverID: number
 
-  constructor(rinfo: RemoteInfo, stream?: BinaryStream) {
-    super(rinfo, stream)
+  constructor(
+    rinfo: RemoteInfo,
+    inputStream: BinaryStream,
+    stream?: BinaryStream
+  ) {
+    super(rinfo, inputStream, stream)
 
     // configuration variables
     const { motd, maxPlayers } = Jukebox.getConfig().server
 
     this.serverName = `MCPE;${motd};389;1.14.1;0;${maxPlayers};${Jukebox.serverID};Jukebox;Creative`
-    this.pingID = this.stream.getLong()
+    this.pingID = this.inputStream.getLong()
     this.serverID = Jukebox.serverID
   }
 

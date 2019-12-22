@@ -3,7 +3,11 @@ import { RemoteInfo } from 'dgram'
 import { Identifiers } from './identifiers'
 
 export interface IPacketConstructor {
-  new (rinfo: RemoteInfo, stream?: BinaryStream): IPacket
+  new (
+    rinfo: RemoteInfo,
+    inputStream: BinaryStream,
+    stream?: BinaryStream
+  ): IPacket
 }
 
 export interface IPacket {
@@ -13,17 +17,23 @@ export interface IPacket {
 }
 
 export class Packet {
+  protected inputStream: BinaryStream
   protected stream: BinaryStream
   protected rinfo: RemoteInfo
   public static pid: number = Identifiers.ID_NOT_SET
 
   //USUAL PACKET FORMAT: xx 00 00 00 00 where xx is pid
 
-  constructor(rinfo: RemoteInfo, stream?: BinaryStream) {
+  constructor(
+    rinfo: RemoteInfo,
+    inputStream: BinaryStream,
+    stream?: BinaryStream
+  ) {
     if (!stream) {
       stream = new BinaryStream()
     }
 
+    this.inputStream = inputStream
     this.stream = stream
     this.rinfo = rinfo
   }

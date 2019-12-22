@@ -12,11 +12,15 @@ export default class OpenConnectionReply2 extends Packet implements IPacket {
   public mtuSize: number = -1
   public serverSecurity: number = -1
 
-  constructor(rinfo: RemoteInfo, stream?: BinaryStream) {
-    super(rinfo, stream)
+  constructor(
+    rinfo: RemoteInfo,
+    inputStream: BinaryStream,
+    stream?: BinaryStream
+  ) {
+    super(rinfo, inputStream, stream)
 
     this.clientPort = rinfo.port
-    this.mtuSize = this.stream.getShort()
+    this.mtuSize = this.inputStream.getShort()
     this.serverID = Jukebox.serverID
   }
 
