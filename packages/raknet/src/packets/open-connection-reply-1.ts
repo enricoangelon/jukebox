@@ -7,7 +7,6 @@ import { Jukebox } from '@jukebox/core'
 export default class OpenConnectionReply1 extends Packet implements IPacket {
   public static pid = Identifiers.ID_OPEN_CONNECTION_REQUEST_1
 
-  public serverID: number
   public serverSecurity: number
   public mtuSize: number
 
@@ -18,15 +17,15 @@ export default class OpenConnectionReply1 extends Packet implements IPacket {
   ) {
     super(rinfo, inputStream, stream)
 
-    this.serverSecurity = 0 //always 0 according to https://wiki.vg/Pocket_Minecraft_Protocol#0x06
+    // TODO: Verify that this should be 0 (https://wiki.vg/Pocket_Minecraft_Protocol#0x06)
+    this.serverSecurity = 0
     this.mtuSize = this.inputStream.getShort()
-    this.serverID = Jukebox.serverID
   }
 
   encode() {
     this.stream.putByte(Identifiers.ID_OPEN_CONNECTION_REPLY_1)
     this.stream.putMagic()
-    this.stream.putLong(this.serverID)
+    this.stream.putLong(Jukebox.serverID)
     this.stream.putShort(this.serverSecurity)
     this.stream.putShort(this.mtuSize)
   }
