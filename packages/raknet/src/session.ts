@@ -3,6 +3,7 @@ import { IPacket, Packet, Datagram, Encapsulated } from './packet'
 import { ConnectionRequestAccepted } from './packets/connection-request'
 import { RemoteInfo } from 'dgram'
 import { Socket } from './socket'
+import { BinaryStream } from '@jukebox/binarystream'
 
 export class RakNetSession {
   public static sessions: Map<string, RakNetSession> = new Map()
@@ -86,7 +87,13 @@ export class RakNetSession {
         pk.sendPongTime = this.getStartTime()
         pk.encode()
         Jukebox.getLogger().debug('Connection Request')
-        Socket.sendBuffer(pk.getBuffer(), rinfo.port, rinfo.address)
+        let encodedPacket = new Encapsulated(
+          rinfo,
+          new BinaryStream(pk.getBuffer())
+        )
+        encodedPacket.reliability = 0 //unreliable
+        encodedPacket.orderChannel = 0
+        Socket.sendBuffer(encodedPacket.getBuffer(), rinfo.port, rinfo.address)
         break
       case 0x13: //New Incoming Connection
         Jukebox.getLogger().debug('New Incoming Connection')
