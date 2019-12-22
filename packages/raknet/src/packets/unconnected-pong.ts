@@ -5,7 +5,7 @@ import { RemoteInfo } from 'dgram'
 import { Jukebox } from '@jukebox/core'
 
 export default class UnconnectedPong extends Packet implements IPacket {
-  public static pid = Identifiers.ID_UNCONNECTED_PONG
+  public static pid = Identifiers.ID_UNCONNECTED_PING
 
   public serverName: string
   public pingID: number

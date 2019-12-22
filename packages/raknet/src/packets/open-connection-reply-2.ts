@@ -5,7 +5,7 @@ import { RemoteInfo } from 'dgram'
 import { Jukebox } from '@jukebox/core'
 
 export default class OpenConnectionReply2 extends Packet implements IPacket {
-  public static pid = Identifiers.ID_OPEN_CONNECTION_REPLY_2
+  public static pid = Identifiers.ID_OPEN_CONNECTION_REQUEST_2
 
   public serverID: number = -1
   public clientPort: number = -1
