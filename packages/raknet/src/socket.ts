@@ -24,6 +24,7 @@ export class Socket {
 
       const imports = await Promise.all(
         files
+          .filter(filename => filename.endsWith('.js'))
           .map(filename => join(dir, filename))
           .map(async filepath => import(filepath))
       )
@@ -36,6 +37,8 @@ export class Socket {
         .forEach(i =>
           Socket.handlers.set(i.pid as number, i as IPacketConstructor)
         )
+
+      Jukebox.getLogger().info(`Loaded ${Socket.handlers.size} handlers`)
     } catch (err) {
       Jukebox.getLogger().fatal('Could not load packets', err)
     }
