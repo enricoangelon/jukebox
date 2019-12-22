@@ -1,4 +1,4 @@
-import { Utils } from '@Jukebox/raknet'
+import { Utils } from './utils'
 
 export class BinaryStream {
   private buffer: Buffer
@@ -30,7 +30,7 @@ export class BinaryStream {
   }
 
   //STE FUNZIONI NON SONO OTTIMIZZATE E SONO PRESE DA POCKETNODE; SERVONO SOLO PER TESTARE; POI VERRANNO SOSTITUITE
-  putLong(v: number) {
+  public putLong(v: number) {
     let MAX_UINT32 = 0xffffffff
 
     let buf = Buffer.alloc(8)
@@ -39,34 +39,34 @@ export class BinaryStream {
     this.append(buf)
   }
 
-  getShort() {
+  public getShort() {
     return this.buffer.readUInt16BE(this.increaseOffset(2))
   }
 
-  putShort(v: number) {
+  public putShort(v: number) {
     let buf = Buffer.alloc(2)
     buf.writeUInt16BE(v, 0)
     this.append(buf)
   }
 
-  putString(v: string) {
+  public putString(v: string) {
     this.append(Buffer.from(v, 'utf8'))
   }
 
-  getMagic() {
+  public getMagic() {
     return this.buffer.slice(this.offset, (this.offset += 16))
   }
 
-  putMagic() {
+  public putMagic() {
     this.append(Buffer.from(Utils.magic, 'binary'))
   }
 
-  append(buffer: Buffer) {
+  public append(buffer: Buffer) {
     this.buffer = Buffer.concat([this.buffer, buffer])
     this.offset += buffer.length
   }
 
-  increaseOffset(v: number) {
+  public increaseOffset(v: number) {
     return (this.offset += v) - v
   }
 

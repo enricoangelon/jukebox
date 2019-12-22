@@ -1,6 +1,4 @@
 export { Socket } from './socket'
-export { Utils } from './utils'
+export { Utils } from '@jukebox/binarystream/src/utils'
 export { Identifiers } from './identifiers'
-export { IPacket } from './packets/i-packet'
-export { UnconnectedPong } from './packets/unconnected-pong'
-export { Packet } from './packets/packet'
+export { Packet, IPacket } from './packet'

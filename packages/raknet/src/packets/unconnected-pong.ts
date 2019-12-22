@@ -1,22 +1,29 @@
-import { Packet } from './packet'
+import { Packet, IPacket } from '../packet'
 import { BinaryStream } from '@jukebox/binarystream'
-import { Utils } from '../utils'
-import { IPacket } from './i-packet'
 import { Identifiers } from '../identifiers'
+import { RemoteInfo } from 'dgram'
+import { Jukebox } from '@jukebox/core'
 
-export class UnconnectedPong extends Packet implements IPacket {
-  public serverName: string = ''
-  public pingID: number = -1
-  public serverID: number = -1
+export default class UnconnectedPong extends Packet implements IPacket {
+  public static pid = Identifiers.ID_UNCONNECTED_PONG
 
-  constructor(stream?: BinaryStream) {
-    super(Identifiers.ID_UNCONNECTED_PONG, stream)
+  public serverName: string
+  public pingID: number
+  public serverID: number
+
+  constructor(rinfo: RemoteInfo, stream?: BinaryStream) {
+    super(rinfo, stream)
+
+    // configuration variables
+    const { motd, maxPlayers } = Jukebox.getConfig().server
+
+    this.serverName = `MCPE;${motd};389;1.14.1;0;${maxPlayers};${Jukebox.serverID};Jukebox;Creative`
+    this.pingID = this.stream.getLong()
+    this.serverID = Jukebox.serverID
   }
 
-  decode() {}
-
   encode() {
-    this.stream.putByte(this.pid)
+    this.stream.putByte(Identifiers.ID_UNCONNECTED_PONG)
     this.stream.putLong(this.pingID)
     this.stream.putLong(this.serverID)
     this.stream.putMagic()

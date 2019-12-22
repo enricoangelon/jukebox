@@ -1,1 +1,2 @@
-export { BinaryStream } from './BinaryStream'
+export { BinaryStream } from './binary-stream'
+export { Utils } from './utils'

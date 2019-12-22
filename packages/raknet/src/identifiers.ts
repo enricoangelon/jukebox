@@ -1,4 +1,7 @@
 export const Identifiers = {
+  // Only for internal use, not a MCPE packet
+  ID_NOT_SET: -129,
+
   ID_CONNECTED_PING: 0x00,
   ID_UNCONNECTED_PING: 0x01,
   ID_UNCONNECTED_PONG: 0x1c,

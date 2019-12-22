@@ -5,10 +5,10 @@ import { Socket } from '@jukebox/raknet'
 
 export class Jukebox {
   private static instance: Jukebox
-  private static readonly serverID: number = Math.floor(
+  private config: Required<Config>
+  public static readonly serverID: number = Math.floor(
     Math.random() * 99999999 + 1
   )
-  private config: Required<Config>
 
   constructor(config: Required<Config>) {
     this.config = config
@@ -38,10 +38,6 @@ export class Jukebox {
 
   public static getLogger(): Logger {
     return Jukebox.instance.config.logger
-  }
-
-  public static getServerID(): number {
-    return Jukebox.serverID
   }
 }
 
