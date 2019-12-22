@@ -49,8 +49,33 @@ export class BinaryStream {
     this.append(buf)
   }
 
+  public getInt() {
+    return this.buffer.readInt32BE(this.increaseOffset(4))
+  }
+
   public putString(v: string) {
     this.append(Buffer.from(v, 'utf8'))
+  }
+
+  public putAddress(addr: string, port: number, version: number = 4) {
+    this.putByte(version)
+    switch (version) {
+      default:
+      case 4:
+        addr.split('.', 4).forEach(b => this.putByte(Number(b) & 0xff))
+        this.putShort(port)
+        break
+    }
+  }
+
+  public getLTriad() {
+    return this.buffer.readUIntLE(this.increaseOffset(3), 3)
+  }
+
+  public putLTriad(v: number) {
+    let buf = Buffer.alloc(3)
+    buf.writeUIntLE(v, 0, 3)
+    this.append(buf)
   }
 
   public getMagic() {
@@ -68,6 +93,10 @@ export class BinaryStream {
 
   public increaseOffset(v: number) {
     return (this.offset += v) - v
+  }
+
+  public feof() {
+    return typeof this.buffer[this.offset] === 'undefined'
   }
 
   public getBuffer(): Buffer {

@@ -5,7 +5,8 @@ import { Identifiers } from './identifiers'
 import { join } from 'path'
 import { promisify } from 'util'
 import { readdir } from 'fs'
-import { IPacketConstructor } from './packet'
+import { IPacketConstructor, Datagram } from './packet'
+import { RakNetSession } from './session'
 
 export class Socket {
   private static socket: DSocket
@@ -45,7 +46,7 @@ export class Socket {
   }
 
   private handle(msg: Buffer, rinfo: RemoteInfo) {
-    let [stream, pid] = [new BinaryStream(msg), msg[0]] //pid can also be buffer.readByte()
+    let [stream, pid] = [new BinaryStream(msg), msg[0]]
     Jukebox.getLogger().debug(
       `Recived a packet from ${rinfo.address}:${rinfo.port} with id: ${pid} and lentgh of ${msg.length}!`
     )
@@ -59,6 +60,13 @@ export class Socket {
       const packet = new packetClass(rinfo, stream)
       packet.encode()
       Socket.sendBuffer(packet.getBuffer(), rinfo.port, rinfo.address)
+    } else if (RakNetSession.sessions.has(rinfo.address)) {
+      // handle encapsulated packets
+      let encodedPacket = new Datagram(rinfo, stream)
+      let session = RakNetSession.sessions.get(rinfo.address)
+      if (session instanceof RakNetSession) {
+        session.handlePacket(rinfo, encodedPacket)
+      }
     } else {
       Jukebox.getLogger().debug(`Unhandled packet with id ${pid}`)
     }
