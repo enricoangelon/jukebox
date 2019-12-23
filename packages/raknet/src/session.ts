@@ -1,6 +1,6 @@
 import { Jukebox } from '@jukebox/core'
 import { IPacket, Packet, Datagram, Encapsulated } from './packet'
-import { ConnectionRequestAccepted } from './packets/connection-request'
+import { ConnectionRequestAccepted } from './packets/connection-request-accepted'
 import { RemoteInfo } from 'dgram'
 import { Socket } from './socket'
 import { BinaryStream } from '@jukebox/binarystream'
@@ -34,7 +34,7 @@ export class RakNetSession {
     let session = new RakNetSession(address, port, clientID, mtuSize)
     RakNetSession.sessions.set(address, session)
     Jukebox.getLogger().debug(
-      `Created RakNet session for ${address} with MTU size ${mtuSize}`
+      `Created RakNet session for ${address}:${port} with MTU size ${mtuSize}`
     )
     return session
   }
@@ -85,14 +85,17 @@ export class RakNetSession {
         this.clientID = packet.stream.getLong() //used to increase offset
         pk.sendPingTime = packet.stream.getLong()
         pk.sendPongTime = this.getStartTime()
+
         pk.encode()
-        Jukebox.getLogger().debug('Connection Request')
+
         let encodedPacket = new Encapsulated(
           rinfo,
-          new BinaryStream(pk.getBuffer())
+          new BinaryStream(pk.getBuffer()), //useless inputsream
+          new BinaryStream(pk.getBuffer()) //used packet stream
         )
         encodedPacket.reliability = 0 //unreliable
         encodedPacket.orderChannel = 0
+        encodedPacket.toBinary()
         Socket.sendBuffer(encodedPacket.getBuffer(), rinfo.port, rinfo.address)
         break
       case 0x13: //New Incoming Connection

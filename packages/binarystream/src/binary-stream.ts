@@ -68,6 +68,12 @@ export class BinaryStream {
     }
   }
 
+  putInt(v: number) {
+    let buf = Buffer.alloc(4)
+    buf.writeInt32BE(v, 0)
+    this.append(buf)
+  }
+
   public getLTriad() {
     return this.buffer.readUIntLE(this.increaseOffset(3), 3)
   }
