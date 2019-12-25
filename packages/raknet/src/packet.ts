@@ -163,8 +163,8 @@ export class Datagram extends Packet {
   public packetPair: boolean = false
   public continuousSend: boolean = false
   public needsBAndAs: boolean = false
-  public sequenceNumber: number = 0
-  public packets: Packet[] = []
+  public sequenceNumber: number = 0 //used to retrive the packet if lost
+  public packets: any[] = [] //todo type
   constructor(
     rinfo: RemoteInfo,
     inputStream: BinaryStream,
@@ -191,11 +191,22 @@ export class Datagram extends Packet {
   }
 
   encode() {
+    //if(this.packetPair === true){
+    //this.headerFlags |= BITFLAG.PACKET_PAIR;
+    //}
+    //if(this.continuousSend === true){
+    //this.headerFlags |= BITFLAG.CONTINUOUS_SEND;
+    //}
+    if (this.needsBAndAs === true) {
+      this.headerFlags |= 0x04
+    }
+
     //encode header
-    this.stream.putByte(0x80 | 0) // to finish
+    this.stream.putByte(0x80 | this.headerFlags) // to finish
+    //this.stream.putByte(0x84) //temporary fix, now i figured out how it works
 
     //encode payload
     this.stream.putLTriad(this.sequenceNumber)
-    this.packets.forEach(packet => this.stream.append(packet.getBuffer()))
+    this.packets.forEach(packet => this.stream.append(packet))
   }
 }

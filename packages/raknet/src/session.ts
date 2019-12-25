@@ -95,8 +95,20 @@ export class RakNetSession {
         )
         encodedPacket.reliability = 0 //unreliable
         encodedPacket.orderChannel = 0
-        encodedPacket.toBinary()
-        Socket.sendBuffer(encodedPacket.getBuffer(), rinfo.port, rinfo.address)
+
+        let dgrampacket = new Datagram(
+          rinfo,
+          new BinaryStream(),
+          new BinaryStream()
+        )
+        dgrampacket.packets.push(encodedPacket.toBinary())
+        dgrampacket.needsBAndAs = true
+        dgrampacket.headerFlags = 0x04
+        dgrampacket.encode()
+
+        console.log(dgrampacket.getBuffer())
+
+        Socket.sendBuffer(dgrampacket.getBuffer(), rinfo.port, rinfo.address)
         break
       case 0x13: //New Incoming Connection
         Jukebox.getLogger().debug('New Incoming Connection')

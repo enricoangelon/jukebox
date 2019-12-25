@@ -92,9 +92,19 @@ export class BinaryStream {
     this.append(Buffer.from(Utils.magic, 'binary'))
   }
 
-  public append(buffer: Buffer) {
-    this.buffer = Buffer.concat([this.buffer, buffer])
-    this.offset += buffer.length
+  append(buf: any) {
+    if (buf instanceof Buffer) {
+      this.buffer = Buffer.concat([this.buffer, buf])
+      this.offset += buf.length
+    } else if (typeof buf === 'string') {
+      buf = Buffer.from(buf, 'hex')
+      this.buffer = Buffer.concat([this.buffer, buf])
+      this.offset += buf.length
+    } else if (Array.isArray(buf)) {
+      buf = Buffer.from(buf)
+      this.buffer = Buffer.concat([this.buffer, buf])
+      this.offset += buf.length
+    }
   }
 
   public increaseOffset(v: number) {

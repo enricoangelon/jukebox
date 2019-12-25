@@ -62,10 +62,9 @@ export class Socket {
       Socket.sendBuffer(packet.getBuffer(), rinfo.port, rinfo.address)
     } else if (RakNetSession.sessions.has(rinfo.address)) {
       // handle encapsulated packets
-      let encodedPacket = new Datagram(rinfo, stream)
       let session = RakNetSession.sessions.get(rinfo.address)
       if (session instanceof RakNetSession) {
-        session.handlePacket(rinfo, encodedPacket)
+        session.handlePacket(rinfo, new Datagram(rinfo, stream))
       }
     } else {
       Jukebox.getLogger().debug(`Unhandled packet with id ${pid}`)
