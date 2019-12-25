@@ -1,12 +1,13 @@
 import { Jukebox } from '@jukebox/core'
 import { createSocket, RemoteInfo, Socket as DSocket } from 'dgram'
 import { BinaryStream } from '@jukebox/binarystream'
-import { Identifiers } from './identifiers'
+import { Identifiers } from './protocol/identifiers'
 import { join } from 'path'
 import { promisify } from 'util'
 import { readdir } from 'fs'
-import { IPacketConstructor, Datagram } from './packet'
+import { IPacketConstructor } from './protocol/packet'
 import { RakNetSession } from './session'
+import { Datagram } from './protocol/datagram'
 
 export class Socket {
   private static socket: DSocket

@@ -1,6 +1,6 @@
-import { Packet, IPacket } from '../packet'
+import { Packet, IPacket } from '../protocol/packet'
 import { BinaryStream } from '@jukebox/binarystream'
-import { Identifiers } from '../identifiers'
+import { Identifiers } from '../protocol/identifiers'
 import { RemoteInfo } from 'dgram'
 import { Jukebox } from '@jukebox/core'
 import { RakNetSession } from '../session'

@@ -92,7 +92,11 @@ export class BinaryStream {
     this.append(Buffer.from(Utils.magic, 'binary'))
   }
 
-  append(buf: any) {
+  public flip() {
+    this.offset = 0
+  }
+
+  public append(buf: any) {
     if (buf instanceof Buffer) {
       this.buffer = Buffer.concat([this.buffer, buf])
       this.offset += buf.length

@@ -1,17 +1,28 @@
 import { Jukebox } from '@jukebox/core'
-import { IPacket, Packet, Datagram, Encapsulated } from './packet'
+import { IPacket, Packet } from './protocol/packet'
 import { ConnectionRequestAccepted } from './packets/connection-request-accepted'
 import { RemoteInfo } from 'dgram'
 import { Socket } from './socket'
 import { BinaryStream } from '@jukebox/binarystream'
+import { Datagram } from './protocol/datagram'
+import { Encapsulated } from './protocol/encapsulated'
 
 export class RakNetSession {
+  /*
+  UNUSED AT THE MOMENT. LEAVE IT THERE
+  static readonly STATE_CONNECTING = 0
+  static readonly STATE_CONNECTED = 1
+  static readonly STATE_DISCONNECTING = 2
+  static readonly STATE_DISCONNECTED = 3
+  */
+
   public static sessions: Map<string, RakNetSession> = new Map()
   private address: string
   private port: number
   private clientID: number
   private mtuSize: number
   private startTime: number
+  private splitPackets: Map<number, Map<number, Packet>> = new Map()
   constructor(
     address: string,
     port: number,
@@ -47,6 +58,10 @@ export class RakNetSession {
     }
   }
 
+  static get(address: string) {
+    //TODO: method to retrive session
+  }
+
   public close() {
     //TODO: check if player is disconnecting and send a message...
     Jukebox.getLogger().debug(`Closed RakNet session for ${this.address}`)
@@ -58,11 +73,53 @@ export class RakNetSession {
 
       //todo all stuff for packets loss
 
-      packet.packets.forEach(pk => this.handleEncapsulatedPacket(rinfo, pk))
+      for (let i = 0; i < packet.packets.length; ++i) {
+        this.handleEncapsulated(rinfo, packet.packets[i])
+      }
+      //forEach is slow... does luca approve? packet.packets.forEach(pk => this.handleEncapsulatedPacket(rinfo, pk))
     }
   }
 
-  public handleEncapsulatedPacket(rinfo: RemoteInfo, packet: Packet) {
+  public handleSplit(rinfo: RemoteInfo, packet: Encapsulated) {
+    if (
+      packet.splitCount > 128 /* Max split size */ ||
+      packet.splitIndex >= 128 ||
+      packet.splitIndex < 0
+    ) {
+      Jukebox.getLogger().debug(`Got invalid split packet from ${this.address}`)
+    }
+
+    if (this.splitPackets.has(packet.splitId)) {
+      let m = this.splitPackets.get(packet.splitId)
+      if (!(typeof m === 'undefined')) {
+        m.set(packet.splitIndex, packet)
+        this.splitPackets.set(packet.splitId, m)
+      }
+    } else {
+      if (this.splitPackets.size >= 4 /* max split count */) {
+        Jukebox.getLogger().debug(
+          `Split packet from ${this.address} ingored because reached the maximum split size of 4`
+        )
+        return
+      }
+      let m = new Map([[packet.splitIndex, packet]])
+      this.splitPackets.set(packet.splitId, m)
+    }
+    let splits = this.splitPackets.get(packet.splitId)
+    if (!(typeof splits === 'undefined') && splits.size === packet.splitCount) {
+      let stream = new BinaryStream()
+      for (let [, splitPacket] of splits) {
+        stream.append(splitPacket.getBuffer())
+      }
+      stream.flip()
+      let pk = new Encapsulated(rinfo, packet.stream, stream)
+      pk.length = stream.offset
+
+      this.handleEncapsulated(rinfo, pk)
+    }
+  }
+
+  public handleEncapsulated(rinfo: RemoteInfo, packet: Packet) {
     if (!(packet instanceof Encapsulated)) return
     let pid = packet.getBuffer()[0]
     Jukebox.getLogger().debug(
@@ -70,18 +127,14 @@ export class RakNetSession {
     )
 
     if (packet.hasSplit) {
-      //todo handle splitted packet
-      Jukebox.getLogger().debug('Need to handle split')
+      this.handleSplit(rinfo, packet)
       return
     }
 
     //oh shit! here we go again...
     switch (pid) {
       case 0x09: //Connection request
-        let pk = new ConnectionRequestAccepted(
-          rinfo,
-          packet.stream /*inputStream*/
-        )
+        let pk = new ConnectionRequestAccepted(rinfo, packet.stream)
         this.clientID = packet.stream.getLong() //used to increase offset
         pk.sendPingTime = packet.stream.getLong()
         pk.sendPongTime = this.getStartTime()
@@ -101,9 +154,7 @@ export class RakNetSession {
           new BinaryStream(),
           new BinaryStream()
         )
-        dgrampacket.packets.push(encodedPacket.toBinary())
-        dgrampacket.needsBAndAs = true
-        dgrampacket.headerFlags = 0x04
+        dgrampacket.packets.push(encodedPacket)
         dgrampacket.encode()
 
         console.log(dgrampacket.getBuffer())
@@ -111,6 +162,8 @@ export class RakNetSession {
         Socket.sendBuffer(dgrampacket.getBuffer(), rinfo.port, rinfo.address)
         break
       case 0x13: //New Incoming Connection
+        // before i cleaned up code i was able to get this... i messed up everything but i cleaned code :P...
+        // UPDATE: cleaned code again and checked, now everything works like charm
         Jukebox.getLogger().debug('New Incoming Connection')
         break
     }

@@ -1,7 +1,7 @@
-import { Packet, IPacket } from '../packet'
+import { Packet, IPacket } from '../protocol/packet'
 import { RemoteInfo } from 'dgram'
 import { BinaryStream } from '@jukebox/binarystream'
-import { Identifiers } from '../identifiers'
+import { Identifiers } from '../protocol/identifiers'
 
 export class ConnectionRequestAccepted extends Packet implements IPacket {
   public static pid = Identifiers.ID_CONNECTION_REQUEST_ACCEPTED
