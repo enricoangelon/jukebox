@@ -8,13 +8,10 @@ import { Datagram } from './protocol/datagram'
 import { Encapsulated } from './protocol/encapsulated'
 
 export class RakNetSession {
-  /*
-  UNUSED AT THE MOMENT. LEAVE IT THERE
   static readonly STATE_CONNECTING = 0
   static readonly STATE_CONNECTED = 1
   static readonly STATE_DISCONNECTING = 2
   static readonly STATE_DISCONNECTED = 3
-  */
 
   public static sessions: Map<string, RakNetSession> = new Map()
   private address: string
@@ -22,6 +19,7 @@ export class RakNetSession {
   private clientID: number
   private mtuSize: number
   private startTime: number
+  public state: number = RakNetSession.STATE_CONNECTING
   private splitPackets: Map<number, Map<number, Packet>> = new Map()
   constructor(
     address: string,
@@ -134,6 +132,7 @@ export class RakNetSession {
     //oh shit! here we go again...
     switch (pid) {
       case 0x09: //Connection request
+        //check if this packet is sent while client is connecting so: if (this.state = RakNetSession.STATE_CONNECTING)
         let pk = new ConnectionRequestAccepted(rinfo, packet.stream)
         this.clientID = packet.stream.getLong() //used to increase offset
         pk.sendPingTime = packet.stream.getLong()
@@ -162,10 +161,15 @@ export class RakNetSession {
         Socket.sendBuffer(dgrampacket.getBuffer(), rinfo.port, rinfo.address)
         break
       case 0x13: //New Incoming Connection
-        // before i cleaned up code i was able to get this... i messed up everything but i cleaned code :P...
-        // UPDATE: cleaned code again and checked, now everything works like charm
-        Jukebox.getLogger().debug('New Incoming Connection')
+        this.state = RakNetSession.STATE_CONNECTED
+        Jukebox.getLogger().debug(
+          `Successfully connected with ${this.address}:${this.port}`
+        )
+        //construct player class
+        //sendPing
         break
+      default:
+        Jukebox.getLogger().debug(`Got unhandled packet with id ${pid}`)
     }
   }
 
