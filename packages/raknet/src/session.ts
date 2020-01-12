@@ -74,7 +74,6 @@ export class RakNetSession {
       for (let i = 0; i < packet.packets.length; ++i) {
         this.handleEncapsulated(rinfo, packet.packets[i])
       }
-      //forEach is slow... does luca approve? packet.packets.forEach(pk => this.handleEncapsulatedPacket(rinfo, pk))
     }
   }
 
@@ -110,14 +109,18 @@ export class RakNetSession {
         stream.append(splitPacket.getBuffer())
       }
       stream.flip()
-      let pk = new Encapsulated(rinfo, packet.stream, stream)
+      let pk = new Encapsulated(
+        rinfo,
+        new BinaryStream(packet.getBuffer()),
+        stream
+      )
       pk.length = stream.offset
 
       this.handleEncapsulated(rinfo, pk)
     }
   }
 
-  public handleEncapsulated(rinfo: RemoteInfo, packet: Packet) {
+  public handleEncapsulated(rinfo: RemoteInfo, packet: Encapsulated) {
     if (!(packet instanceof Encapsulated)) return
     let pid = packet.getBuffer()[0]
     Jukebox.getLogger().debug(
@@ -133,9 +136,10 @@ export class RakNetSession {
     switch (pid) {
       case 0x09: //Connection request
         //check if this packet is sent while client is connecting so: if (this.state = RakNetSession.STATE_CONNECTING)
-        let pk = new ConnectionRequestAccepted(rinfo, packet.stream)
-        this.clientID = packet.stream.getLong() //used to increase offset
-        pk.sendPingTime = packet.stream.getLong()
+        let stream = new BinaryStream(packet.getBuffer())
+        let pk = new ConnectionRequestAccepted(rinfo, stream)
+        this.clientID = stream.getLong() //used to increase offset
+        pk.sendPingTime = stream.getLong()
         pk.sendPongTime = this.getStartTime()
 
         pk.encode()
@@ -155,8 +159,6 @@ export class RakNetSession {
         )
         dgrampacket.packets.push(encodedPacket)
         dgrampacket.encode()
-
-        console.log(dgrampacket.getBuffer())
 
         Socket.sendBuffer(dgrampacket.getBuffer(), rinfo.port, rinfo.address)
         break
@@ -179,7 +181,3 @@ export class RakNetSession {
 
   private static checkQueue() {}
 }
-
-//;(async function() {
-//process.nextTick()
-//})()

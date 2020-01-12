@@ -17,5 +17,6 @@ export default {
     port: 19132,
     motd: 'A jukebox minecraft bedrock server',
     maxPlayers: 20,
+    gameMode: 'Survival', // string format
   },
 }

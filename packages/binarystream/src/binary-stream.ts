@@ -68,7 +68,7 @@ export class BinaryStream {
     }
   }
 
-  putInt(v: number) {
+  public putInt(v: number) {
     let buf = Buffer.alloc(4)
     buf.writeInt32BE(v, 0)
     this.append(buf)
@@ -96,7 +96,7 @@ export class BinaryStream {
     this.offset = 0
   }
 
-  public append(buf: any) {
+  public append(buf: string | Buffer | number[]) {
     if (buf instanceof Buffer) {
       this.buffer = Buffer.concat([this.buffer, buf])
       this.offset += buf.length

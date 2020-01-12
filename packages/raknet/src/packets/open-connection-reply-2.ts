@@ -1,28 +1,15 @@
 import { Packet, IPacket } from '../protocol/packet'
-import { BinaryStream } from '@jukebox/binarystream'
 import { Identifiers } from '../protocol/identifiers'
-import { RemoteInfo } from 'dgram'
 import { Jukebox } from '@jukebox/core'
 import { RakNetSession } from '../session'
 
 export default class OpenConnectionReply2 extends Packet implements IPacket {
   public static pid = Identifiers.ID_OPEN_CONNECTION_REQUEST_2
 
-  public clientPort: number
-  public mtuSize: number
+  public clientPort: number = this.rinfo.port
+  public mtuSize: number = this.inputStream.getShort()
 
-  constructor(
-    rinfo: RemoteInfo,
-    inputStream: BinaryStream,
-    stream?: BinaryStream
-  ) {
-    super(rinfo, inputStream, stream)
-
-    this.clientPort = rinfo.port
-    this.mtuSize = this.inputStream.getShort()
-  }
-
-  encode() {
+  public encode() {
     this.stream.putByte(Identifiers.ID_OPEN_CONNECTION_REPLY_2)
     this.stream.putMagic()
     this.stream.putLong(Jukebox.serverID)

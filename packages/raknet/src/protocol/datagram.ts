@@ -1,6 +1,4 @@
 import { Packet } from './packet'
-import { RemoteInfo } from 'dgram'
-import { BinaryStream } from '@jukebox/binarystream'
 import { Encapsulated } from './encapsulated'
 
 export class Datagram extends Packet {
@@ -17,15 +15,8 @@ export class Datagram extends Packet {
   public headerFlags: number = 0
   public seqNumber: number = 0 //used to retrive the packet if lost
   public packets: Encapsulated[] = []
-  constructor(
-    rinfo: RemoteInfo,
-    inputStream: BinaryStream,
-    stream?: BinaryStream
-  ) {
-    super(rinfo, inputStream, stream)
-  }
 
-  decode() {
+  public decode() {
     //decode header
     this.headerFlags = this.inputStream.getByte()
 
@@ -33,28 +24,21 @@ export class Datagram extends Packet {
     this.seqNumber = this.inputStream.getLTriad()
 
     while (!this.inputStream.feof()) {
-      let packet = Encapsulated.fromBinary(this.inputStream)
+      let packet = Encapsulated.fromBinary(this.inputStream, this.rinfo)
       if (!(packet.getBuffer().length === 0)) {
         this.packets.push(packet)
       }
     }
   }
 
-  encode() {
+  public encode() {
     //encode header
     this.stream.putByte(Datagram.BITFLAG_VALID | this.headerFlags)
 
     //encode payload
     this.stream.putLTriad(this.seqNumber)
-    //https://stackoverflow.com/questions/5349425/whats-the-fastest-way-to-loop-through-an-array-in-javascript
-    //prefix vs postfix increment? prefixs seems to be faster than
     for (let i = 0; i < this.packets.length; ++i) {
-      this.stream.append(
-        this.packets[i] instanceof Encapsulated
-          ? this.packets[i].toBinary()
-          : this.packets[i]
-      )
+      this.stream.append(this.packets[i].toBinary())
     }
-    //forEach is slow... waiting for Luca: this.packets.forEach(packet => this.stream.append(packet))
   }
 }

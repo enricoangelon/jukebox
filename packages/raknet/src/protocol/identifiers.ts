@@ -1,4 +1,8 @@
 export const Identifiers = {
+  // RakNet related stuff
+  GAME_PROTOCOL: 389,
+  GAME_VERSION: '1.14.1',
+
   // Only for internal use, not a MCPE packet
   ID_NOT_SET: -129,
 

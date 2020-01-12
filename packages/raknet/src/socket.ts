@@ -8,6 +8,7 @@ import { readdir } from 'fs'
 import { IPacketConstructor } from './protocol/packet'
 import { RakNetSession } from './session'
 import { Datagram } from './protocol/datagram'
+import { ServerName } from './protocol/server-name'
 
 export class Socket {
   private static socket: DSocket
@@ -15,7 +16,7 @@ export class Socket {
     number,
     IPacketConstructor
   >()
-  //private static packetsList: Map<number, Object>
+  private static serverName: ServerName = new ServerName(Jukebox) //trick
 
   // imports all files from the src/packets folder
   // and adds them to the handling map
@@ -92,9 +93,9 @@ export class Socket {
     return Socket.socket
   }
 
-  //public static getPacketsList(): Map<number, Object> {
-  //return this.packetsList
-  //}
+  public static getRakServerName(): ServerName {
+    return Socket.serverName
+  }
 
   public static sendBuffer(buffer: Buffer, port: number, address: string) {
     Socket.socket.send(buffer, 0, buffer.length, port, address)

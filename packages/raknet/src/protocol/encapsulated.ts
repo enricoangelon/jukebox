@@ -25,33 +25,11 @@ export class Encapsulated extends Packet {
   public splitIndex: number = -1
   public needAck: boolean = false
 
-  // Maybe extending packet is useless if is just used for functions
-  // WTF is wrong with those protected variables? they are already declared in Packet class...
-  public stream: BinaryStream
-  static inputStream: BinaryStream
-  static rinfo: RemoteInfo
-  constructor(
-    rinfo: RemoteInfo,
-    inputStream: BinaryStream,
-    stream: BinaryStream
-  ) {
-    super(rinfo, inputStream)
-    this.inputStream = inputStream
-    this.rinfo = rinfo
-    this.stream = stream
-  }
-
-  //TODO: fix arg and class variables
-  static fromBinary(stream: BinaryStream) {
-    //this.rinfo, this.inputStream, this.stream should be right
-    let packet = new Encapsulated(
-      this.rinfo,
-      this.inputStream,
-      this.inputStream
-    ) // third arg should be this.stream but it is not found in class so it'S the same like that
+  public static fromBinary(stream: BinaryStream, rinfo: RemoteInfo) {
+    let packet = new Encapsulated(rinfo, stream)
 
     let flags = stream.getByte()
-    //let [reliability = packet.reliability, hasSplit = packet.hasSplit, length = packet.length] = [(flags & 0xe0) >> 5, (flags & 0x10) > 0, Math.ceil(stream.getShort() / 8)] //to check if it's correct, it must be
+
     packet.reliability = (flags & 0xe0) >> 5
     packet.hasSplit = (flags & 0x10) > 0
     packet.length = Math.ceil(stream.getShort() / 8)
