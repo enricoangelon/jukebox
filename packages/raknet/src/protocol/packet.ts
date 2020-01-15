@@ -20,23 +20,47 @@ export class Packet {
   protected inputStream: BinaryStream
   protected stream: BinaryStream
   protected rinfo: RemoteInfo
-  public static pid: number = Identifiers.ID_NOT_SET
+  public static pid: number = -1
 
   //USUAL PACKET FORMAT: xx 00 00 00 00 where xx is pid
 
   constructor(
     rinfo: RemoteInfo,
-    inputStream: BinaryStream,
+    inputStream?: BinaryStream,
     stream?: BinaryStream
   ) {
     if (!stream) {
       stream = new BinaryStream()
     }
 
+    if (!inputStream) {
+      inputStream = new BinaryStream()
+    }
+
     this.inputStream = inputStream
     this.stream = stream
     this.rinfo = rinfo
   }
+
+  // we have to move like this instead of doing things manually
+
+  /*
+  public encodeHeader() {
+    this.stream.putByte(this.constructor.pid)
+  }
+
+  public decodeHeader() {
+    stream.getByte()
+  }
+
+  public encode() {
+    this.encodeHeader()
+  }
+
+  public decode() {
+    this.decodeHeader()
+  }
+  */
 
   public getBuffer(): Buffer {
     return this.stream.getBuffer()

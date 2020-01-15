@@ -57,6 +57,24 @@ export class BinaryStream {
     this.append(Buffer.from(v, 'utf8'))
   }
 
+  public getAddress() {
+    let addr, port
+    let version = this.getByte()
+    switch (version) {
+      default:
+      case 4:
+        addr = []
+        for (let i = 0; i < 4; i++) {
+          addr.push(this.getByte() & 0xff)
+        }
+        addr = addr.join('.')
+        port = this.getShort()
+        break
+      // add ipv6 support
+    }
+    return { ip: addr, port: port, version: version } // InternetAddress from @raknet
+  }
+
   public putAddress(addr: string, port: number, version: number = 4) {
     this.putByte(version)
     switch (version) {

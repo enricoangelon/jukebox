@@ -9,8 +9,8 @@ export class ServerName {
   private gameName: string = 'MCPE'
   private messageOfTheDay: string | undefined =
     /*typeof Jukebox.getConfig().server.motd !== 'undefined' ? Jukebox.getConfig().server.motd : */ 'No motd set in config'
-  private gameProtocol: number = Identifiers.GAME_PROTOCOL
-  private gameVersion: string = Identifiers.GAME_VERSION
+  private gameProtocol: number = 389
+  private gameVersion: string = '1.14.1'
   private onlinePlayers: number = 0 //TODO a server method in future
   private maxPlayers:
     | number

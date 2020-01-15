@@ -2,7 +2,7 @@ import { Packet } from './packet'
 import { BinaryStream } from '@jukebox/binarystream'
 import { RemoteInfo } from 'dgram'
 import { Jukebox } from '@jukebox/core'
-import { ReliabilityUtils } from './reliability/reliability-utils'
+import { ReliabilityUtils } from './reliability-utils'
 
 export class Encapsulated extends Packet {
   // need to find these values documentation, as i understand

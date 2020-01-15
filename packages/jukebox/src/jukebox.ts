@@ -1,11 +1,12 @@
 import { Config } from './config'
 import { resolve } from 'path'
 import { Logger } from './logger'
-import { Socket } from '@jukebox/raknet'
+import { RakNetInstancer } from './network/raknet-instancer'
 
 export class Jukebox {
   private static instance: Jukebox
   private config: Required<Config>
+  private socketAdapter: RakNetInstancer | undefined
   public static readonly serverID: number = Math.floor(
     Math.random() * 99999999 + 1
   )
@@ -23,7 +24,7 @@ export class Jukebox {
   }
 
   public start() {
-    new Socket()
+    this.socketAdapter = new RakNetInstancer()
 
     // TODO: Implement bootstrapping
   }
@@ -38,6 +39,10 @@ export class Jukebox {
 
   public static getLogger(): Logger {
     return Jukebox.instance.config.logger
+  }
+
+  public static getPort(): number {
+    return Jukebox.getConfig().server.port || 19132
   }
 }
 

@@ -36,7 +36,7 @@ export class Socket {
         .map(i => i.default)
         // Ignore modules that don't export a default class
         // and packets with undefined `pid`
-        .filter(i => !!i && i.pid != Identifiers.ID_NOT_SET)
+        .filter(i => !!i && i.pid != -1)
         .forEach(i =>
           Socket.handlers.set(i.pid as number, i as IPacketConstructor)
         )
@@ -65,8 +65,20 @@ export class Socket {
     } else if (RakNetSession.sessions.has(rinfo.address)) {
       // handle encapsulated packets
       let session = RakNetSession.sessions.get(rinfo.address)
-      if (session instanceof RakNetSession) {
-        session.handlePacket(rinfo, new Datagram(rinfo, stream))
+      if (
+        (pid & Datagram.BITFLAG_VALID) !== 0 &&
+        session instanceof RakNetSession
+      ) {
+        // ACK and NACK are supposed to be for packet loss, the
+        // way to use them is really hard with the documentation we have atm
+        // so i think we will have to make them in the future but not now
+        if (pid & Datagram.BITFLAG_ACK) {
+          // session.handlePacket(rinfo, ) TODO
+        } else if (pid & Datagram.BITFLAG_NAK) {
+          // session.handlePacket(rinfo, ) TODO
+        } else {
+          session.handlePacket(rinfo, new Datagram(rinfo, stream))
+        }
       }
     } else {
       Jukebox.getLogger().debug(`Unhandled packet with id ${pid}`)

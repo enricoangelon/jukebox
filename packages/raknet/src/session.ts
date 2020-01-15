@@ -6,6 +6,9 @@ import { Socket } from './socket'
 import { BinaryStream } from '@jukebox/binarystream'
 import { Datagram } from './protocol/datagram'
 import { Encapsulated } from './protocol/encapsulated'
+import { PacketReliability } from './protocol/reliability'
+import { Identifiers } from './protocol/identifiers'
+import { ConnectedPing } from './packets/connected-ping'
 
 export class RakNetSession {
   static readonly STATE_CONNECTING = 0
@@ -18,7 +21,7 @@ export class RakNetSession {
   private port: number
   private clientID: number
   private mtuSize: number
-  private startTime: number
+  private static startTime: number
   public state: number = RakNetSession.STATE_CONNECTING
   private splitPackets: Map<number, Map<number, Packet>> = new Map()
   constructor(
@@ -32,7 +35,7 @@ export class RakNetSession {
     this.clientID = clientID
     this.mtuSize = mtuSize
 
-    this.startTime = Date.now()
+    RakNetSession.startTime = Date.now()
   }
   static create(
     address: string,
@@ -128,50 +131,61 @@ export class RakNetSession {
       return
     }
 
-    //oh shit! here we go again...
-    switch (pid) {
-      case 0x09: //Connection request
-        //check if this packet is sent while client is connecting so: if (this.state = RakNetSession.STATE_CONNECTING)
+    if (this.state === RakNetSession.STATE_CONNECTING) {
+      if (pid === Identifiers.ID_CONNECTION_REQUEST) {
         let stream = new BinaryStream(packet.getBuffer())
-        let pk = new ConnectionRequestAccepted(rinfo, stream)
-        this.clientID = stream.getLong() //used to increase offset
-        pk.sendPingTime = stream.getLong()
-        pk.sendPongTime = this.getStartTime()
+        this.clientID = stream.getLong()
+        let pk = new ConnectionRequestAccepted(rinfo, stream, undefined)
 
         pk.encode()
 
         let encodedPacket = new Encapsulated(
           rinfo,
-          new BinaryStream(pk.getBuffer()), //useless inputsream
-          new BinaryStream(pk.getBuffer()) //used packet stream
+          undefined,
+          new BinaryStream(pk.getBuffer())
         )
-        encodedPacket.reliability = 0 //unreliable
+        encodedPacket.reliability = PacketReliability.UNRELIABLE
         encodedPacket.orderChannel = 0
 
-        let dgrampacket = new Datagram(
-          rinfo,
-          new BinaryStream(),
-          new BinaryStream()
-        )
+        let dgrampacket = new Datagram(rinfo)
         dgrampacket.packets.push(encodedPacket)
         dgrampacket.encode()
 
         Socket.sendBuffer(dgrampacket.getBuffer(), rinfo.port, rinfo.address)
-        break
-      case 0x13: //New Incoming Connection
+      } else if (pid === Identifiers.ID_NEW_INCOMING_CONNECTION) {
         this.state = RakNetSession.STATE_CONNECTED
-        Jukebox.getLogger().debug(
-          `Successfully connected with ${this.address}:${this.port}`
-        )
-        //construct player class
-        //sendPing
-        break
-      default:
+
+        let stream = new BinaryStream(packet.getBuffer())
+        stream.getByte() // increase offset
+        let address = stream.getAddress()
+
+        if (address.port === Jukebox.getPort()) {
+          // port checking todo (not important)
+          Jukebox.getLogger().debug(
+            `Successfully connected with ${this.address}:${this.port}`
+          )
+          this.state = RakNetSession.STATE_CONNECTED
+
+          // open session
+
+          this.sendPing(rinfo)
+        }
+      } else {
         Jukebox.getLogger().debug(`Got unhandled packet with id ${pid}`)
+      }
     }
   }
 
-  public getStartTime() {
+  public sendPing(
+    rinfo: RemoteInfo,
+    reliability: number = PacketReliability.UNRELIABLE
+  ) {
+    let pk = new ConnectedPing(rinfo)
+    pk.encode()
+    Socket.sendBuffer(pk.getBuffer(), rinfo.port, rinfo.address)
+  }
+
+  public static getStartTime() {
     return Date.now() - this.startTime
   }
 }
