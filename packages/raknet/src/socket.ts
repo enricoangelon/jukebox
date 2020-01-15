@@ -1,7 +1,6 @@
 import { Jukebox } from '@jukebox/core'
 import { createSocket, RemoteInfo, Socket as DSocket } from 'dgram'
 import { BinaryStream } from '@jukebox/binarystream'
-import { Identifiers } from './protocol/identifiers'
 import { join } from 'path'
 import { promisify } from 'util'
 import { readdir } from 'fs'
