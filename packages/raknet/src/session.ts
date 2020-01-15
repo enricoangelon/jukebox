@@ -48,16 +48,12 @@ export class RakNetSession {
     return session
   }
 
-  static remove(session: RakNetSession, reason?: string) {
+  public static remove(session: RakNetSession, reason?: string) {
     let address = session.address
     if (RakNetSession.sessions.has(address)) {
       RakNetSession.sessions.get(address)!.close()
       RakNetSession.sessions.delete(address)
     }
-  }
-
-  static get(address: string) {
-    //TODO: method to retrive session
   }
 
   public close() {
@@ -175,9 +171,7 @@ export class RakNetSession {
     }
   }
 
-  getStartTime() {
+  public getStartTime() {
     return Date.now() - this.startTime
   }
-
-  private static checkQueue() {}
 }
