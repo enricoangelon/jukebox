@@ -2,8 +2,8 @@ import { Packet } from './packet'
 import { Encapsulated } from './encapsulated'
 
 export class Datagram extends Packet {
-  /* BitFlags */
-  static readonly BITFLAG_VALID = 0x80 //is it a good practise?
+  /* Packet BitFlags */
+  static readonly BITFLAG_VALID = 0x80
   static readonly BITFLAG_ACK = 0x40
   static readonly BITFLAG_NAK = 0x20
 

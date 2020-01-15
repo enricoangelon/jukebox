@@ -1,12 +1,6 @@
 import { Identifiers } from '../protocol/identifiers'
 
 export class ServerName {
-  private jukebox: any //i cant import jukebox or i get undefined class
-
-  constructor(jukebox: any) {
-    this.jukebox = jukebox
-  }
-
   /*
   TypeError: Cannot read property 'getConfig' of undefined (when i import it using imports) so i made constructor
   Luca pls fix it for me :/
@@ -28,7 +22,7 @@ export class ServerName {
 
   //TODO make user friendly functions to change data (not important now)
 
-  public getServerName(): string {
+  public getName(): string {
     return `${this.gameName};${this.messageOfTheDay};${this.gameProtocol};${this.gameVersion};${this.onlinePlayers};${this.maxPlayers};${this.serverID};${this.softwareName};${this.gameMode}`
   }
 }

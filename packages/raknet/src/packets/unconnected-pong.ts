@@ -13,9 +13,7 @@ export default class UnconnectedPong extends Packet implements IPacket {
     this.stream.putLong(this.pingID)
     this.stream.putLong(Jukebox.serverID)
     this.stream.putMagic()
-    this.stream.putShort(Socket.getRakServerName().getServerName().length)
-    this.stream.putString(
-      Socket.getRakServerName().getServerName() /* maybe those methods can be renamed */
-    )
+    this.stream.putShort(Socket.getRakServerName().getName().length)
+    this.stream.putString(Socket.getRakServerName().getName())
   }
 }

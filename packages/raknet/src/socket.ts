@@ -16,7 +16,7 @@ export class Socket {
     number,
     IPacketConstructor
   >()
-  private static serverName: ServerName = new ServerName(Jukebox) //trick
+  private static serverName: ServerName = new ServerName()
 
   // imports all files from the src/packets folder
   // and adds them to the handling map
