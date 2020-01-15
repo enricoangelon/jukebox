@@ -20,7 +20,7 @@ export class Packet {
   protected inputStream: BinaryStream
   protected stream: BinaryStream
   protected rinfo: RemoteInfo
-  public static pid: number = -1
+  public pid: number = -1
 
   //USUAL PACKET FORMAT: xx 00 00 00 00 where xx is pid
 
@@ -44,13 +44,12 @@ export class Packet {
 
   // we have to move like this instead of doing things manually
 
-  /*
   public encodeHeader() {
-    this.stream.putByte(this.constructor.pid)
+    this.stream.putByte(this.pid)
   }
 
   public decodeHeader() {
-    stream.getByte()
+    this.stream.getByte()
   }
 
   public encode() {
@@ -60,7 +59,6 @@ export class Packet {
   public decode() {
     this.decodeHeader()
   }
-  */
 
   public getBuffer(): Buffer {
     return this.stream.getBuffer()

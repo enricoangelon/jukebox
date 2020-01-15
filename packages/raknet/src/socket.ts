@@ -35,7 +35,7 @@ export class Socket {
         .map(i => i.default)
         // Ignore modules that don't export a default class
         // and packets with undefined `pid`
-        .filter(i => !!i && i.pid != -1)
+        .filter(i => !!i && i.pid != -1) // make new way
         .forEach(i =>
           Socket.handlers.set(i.pid as number, i as IPacketConstructor)
         )

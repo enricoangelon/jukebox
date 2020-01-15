@@ -6,6 +6,7 @@ import { InternetAddress } from '../protocol/internet-address'
 import { Utils } from '@jukebox/binarystream'
 
 export class ConnectionRequestAccepted extends Packet implements IPacket {
+  public pid = Identifiers.ID_CONNECTION_REQUEST_ACCEPTED
   public static pid = Identifiers.ID_CONNECTION_REQUEST_ACCEPTED
 
   public sendPingTime: number = this.inputStream.getLong()
@@ -16,8 +17,6 @@ export class ConnectionRequestAccepted extends Packet implements IPacket {
   ]
 
   public encode() {
-    this.stream.putByte(Identifiers.ID_CONNECTION_REQUEST_ACCEPTED)
-
     this.stream.putAddress(this.rinfo.address, this.rinfo.port, 4)
     this.stream.putShort(0) //unknown
 

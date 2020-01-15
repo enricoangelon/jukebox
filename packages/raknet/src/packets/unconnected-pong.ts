@@ -4,12 +4,12 @@ import { Jukebox } from '@jukebox/core'
 import { Socket } from '../socket'
 
 export default class UnconnectedPong extends Packet implements IPacket {
-  public static pid = Identifiers.ID_UNCONNECTED_PING
+  public pid = Identifiers.ID_UNCONNECTED_PONG //to send
+  public static pid = Identifiers.ID_UNCONNECTED_PING // server search for
 
   public pingID: number = this.inputStream.getLong()
 
   public encode() {
-    this.stream.putByte(Identifiers.ID_UNCONNECTED_PONG)
     this.stream.putLong(this.pingID)
     this.stream.putLong(Jukebox.serverID)
     this.stream.putMagic()
