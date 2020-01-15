@@ -42,13 +42,13 @@ export class Encapsulated extends Packet {
         )
       : ''
 
-    ReliabilityUtils.isReliable(reliability)
-      ? (packet.messageIndex = stream.getLTriad())
-      : ''
+    if (ReliabilityUtils.isReliable(reliability)) {
+      packet.messageIndex = stream.getLTriad()
+    }
 
-    ReliabilityUtils.isSequenced(reliability)
-      ? (packet.sequenceIndex = stream.getLTriad())
-      : ''
+    if (ReliabilityUtils.isSequenced(reliability)) {
+      packet.sequenceIndex = stream.getLTriad()
+    }
 
     if (ReliabilityUtils.isSequencedOrOrdered(reliability)) {
       packet.orderIndex = stream.getLTriad()
@@ -78,13 +78,13 @@ export class Encapsulated extends Packet {
     )
     stream.putShort(this.getBuffer().length << 3)
 
-    ReliabilityUtils.isReliable(this.reliability)
-      ? stream.putLTriad(this.messageIndex)
-      : ''
+    if (ReliabilityUtils.isReliable(this.reliability)) {
+      stream.putLTriad(this.messageIndex)
+    }
 
-    ReliabilityUtils.isSequenced(this.reliability)
-      ? stream.putLTriad(this.sequenceIndex)
-      : ''
+    if (ReliabilityUtils.isSequenced(this.reliability)) {
+      stream.putLTriad(this.sequenceIndex)
+    }
 
     if (ReliabilityUtils.isSequencedOrOrdered(this.reliability)) {
       stream.putLTriad(this.orderIndex)
