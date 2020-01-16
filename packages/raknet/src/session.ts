@@ -183,9 +183,7 @@ export class RakNetSession {
         let session = RakNetSession.sessions.get(rinfo.address)
         if (session instanceof RakNetSession) {
           if (session.player && session.player instanceof Player) {
-            let stream = new BinaryStream(packet.getBuffer())
-            stream.getByte()
-            session.player.packetHandler.handleBatched(rinfo, stream) // WORNG DATA!!!
+            session.player.packetHandler.handleBatched(rinfo, packet) // fix this error...
           }
         }
       }

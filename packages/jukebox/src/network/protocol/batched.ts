@@ -4,6 +4,7 @@ import { Jukebox } from '../../jukebox'
 import * as Zlib from 'zlib' // https://github.com/nodeca/pako
 import { PacketHandler } from '../packet-handler'
 import { RemoteInfo } from 'dgram'
+import { McpeLogin } from '../packets/mcpe-login'
 
 export class Batched extends Datagram {
   public pid: number = 0xfe
@@ -15,7 +16,7 @@ export class Batched extends Datagram {
   public payload = new BinaryStream()
 
   public decodeHeader() {
-    let decodedPID = this.getInt()
+    let decodedPID = this.getByte()
     if (decodedPID !== this.pid) {
       Jukebox.getLogger().error(
         `Got a packet with wrong PID, expecting: ${this.pid}, got: ${decodedPID}!`
@@ -43,8 +44,23 @@ export class Batched extends Datagram {
     // make a packet pool or something
     // to create packet by packet id, so get packet class
     // and set to packet class the buffer given
+    if (this.payload.getBuffer().length === 0) {
+      return
+    }
+
     let pid = this.getBuffer()[0]
 
-    Jukebox.getLogger().debug(`GOT BATCHED: ${pid}`)
+    let pk = McpeLogin
+
+    if (pk instanceof Datagram) {
+      if (!pk.allowBatching) {
+        Jukebox.getLogger().error(`Invalid batched ${pk.getName()}`)
+      }
+
+      pk.setBuffer(this.getBuffer(), 1)
+      packetHandler.handleDatagram(pk)
+    }
+    if (pid === 0x01) {
+    }
   }
 }
