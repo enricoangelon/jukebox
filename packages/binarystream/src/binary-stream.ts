@@ -53,8 +53,48 @@ export class BinaryStream {
     return this.buffer.readInt32BE(this.increaseOffset(4))
   }
 
+  public getUnsignedVarInt() {
+    let value = 0
+
+    for (let i = 0; i <= 35; i += 7) {
+      let b = this.getByte()
+      value |= (b & 0x7f) << i
+
+      if ((b & 0x80) === 0) {
+        return value
+      }
+    }
+
+    return 0
+  }
+
+  public putUnsignedVarInt(v: number) {
+    let stream = new BinaryStream()
+    for (let i = 0; i < 5; i++) {
+      if (v >> 7 !== 0) {
+        stream.putByte(v | 0x80)
+      } else {
+        stream.putByte(v & 0x7f)
+        break
+      }
+      v >>= 7
+    }
+    this.append(stream.buffer)
+  }
+
   public putString(v: string) {
     this.append(Buffer.from(v, 'utf8'))
+  }
+
+  public setBuffer(buffer = Buffer.alloc(0), offset: number = 0) {
+    this.buffer = buffer
+    this.offset = offset
+  }
+
+  public getRemaining() {
+    let buf = this.buffer.slice(this.offset)
+    this.offset = this.buffer.length
+    return buf
   }
 
   public getAddress() {

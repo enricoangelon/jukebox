@@ -1,6 +1,5 @@
 import { BinaryStream } from '@jukebox/binarystream'
 import { RemoteInfo } from 'dgram'
-import { Identifiers } from './identifiers'
 
 export interface IPacketConstructor {
   new (

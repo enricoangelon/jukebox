@@ -9,6 +9,7 @@ import { Encapsulated } from './protocol/encapsulated'
 import { PacketReliability } from './protocol/reliability'
 import { Identifiers } from './protocol/identifiers'
 import { ConnectedPing } from './packets/connected-ping'
+import { Player } from '@jukebox/core'
 
 export class RakNetSession {
   static readonly STATE_CONNECTING = 0
@@ -17,6 +18,7 @@ export class RakNetSession {
   static readonly STATE_DISCONNECTED = 3
 
   public static sessions: Map<string, RakNetSession> = new Map()
+  private player: Player | undefined
   private address: string
   private port: number
   private clientID: number
@@ -134,7 +136,7 @@ export class RakNetSession {
     if (this.state === RakNetSession.STATE_CONNECTING) {
       if (pid === Identifiers.ID_CONNECTION_REQUEST) {
         let stream = new BinaryStream(packet.getBuffer())
-        // stream.getByte() // fix index
+        // stream.getByte() // fix index, not sure of this one
 
         this.clientID = stream.getLong()
         let pk = new ConnectionRequestAccepted(rinfo, stream, undefined)
@@ -158,7 +160,7 @@ export class RakNetSession {
         this.state = RakNetSession.STATE_CONNECTED
 
         let stream = new BinaryStream(packet.getBuffer())
-        // stream.getByte() // increase offset
+        stream.getByte() // increase offset
         let address = stream.getAddress()
 
         if (address.port === Jukebox.getPort()) {
@@ -168,19 +170,33 @@ export class RakNetSession {
           )
           this.state = RakNetSession.STATE_CONNECTED
 
-          // open session
+          this.player = new Player() // idk, my idea is to assing a session / player, so from session i can get player
 
           this.sendPing(rinfo)
         }
-      } else {
-        Jukebox.getLogger().debug(`Got unhandled packet with id ${pid}`)
       }
+    } else if (pid === 0xfe && this.state === RakNetSession.STATE_CONNECTED) {
+      // minecraft header
+      Jukebox.getLogger().debug(`Got a Minecraft related packet`)
+
+      if (RakNetSession.sessions.has(rinfo.address)) {
+        let session = RakNetSession.sessions.get(rinfo.address)
+        if (session instanceof RakNetSession) {
+          if (session.player && session.player instanceof Player) {
+            let stream = new BinaryStream(packet.getBuffer())
+            stream.getByte()
+            session.player.packetHandler.handleBatched(rinfo, stream) // WORNG DATA!!!
+          }
+        }
+      }
+    } else {
+      Jukebox.getLogger().debug(`Got unhandled packet with id ${pid}`)
     }
   }
 
   public sendPing(
-    rinfo: RemoteInfo,
-    reliability: number = PacketReliability.UNRELIABLE
+    rinfo: RemoteInfo
+    /*reliability: number = PacketReliability.UNRELIABLE*/
   ) {
     let pk = new ConnectedPing(rinfo)
     pk.encode()

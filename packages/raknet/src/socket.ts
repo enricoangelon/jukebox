@@ -8,6 +8,7 @@ import { IPacketConstructor } from './protocol/packet'
 import { RakNetSession } from './session'
 import { Datagram } from './protocol/datagram'
 import { ServerName } from './protocol/server-name'
+import { Identifiers } from './protocol/identifiers'
 
 export class Socket {
   private static socket: DSocket
@@ -40,7 +41,9 @@ export class Socket {
           Socket.handlers.set(i.pid as number, i as IPacketConstructor)
         )
 
-      Jukebox.getLogger().info(`Loaded ${Socket.handlers.size} handlers`)
+      Jukebox.getLogger().info(
+        `Loaded OfflineMessage ${Socket.handlers.size} handlers`
+      )
     } catch (err) {
       Jukebox.getLogger().fatal('Could not load packets', err)
     }
@@ -48,9 +51,13 @@ export class Socket {
 
   private handle(msg: Buffer, rinfo: RemoteInfo) {
     let [stream, pid] = [new BinaryStream(msg), msg[0]]
-    Jukebox.getLogger().debug(
-      `Recived a packet from ${rinfo.address}:${rinfo.port} with id: ${pid} and lentgh of ${msg.length}!`
-    )
+
+    if (pid !== Identifiers.ID_UNCONNECTED_PING) {
+      // used just in development to remove unconnected ping spam
+      Jukebox.getLogger().debug(
+        `Recived a packet from ${rinfo.address}:${rinfo.port} with id: ${pid} and lentgh of ${msg.length}!`
+      )
+    }
 
     if (Socket.handlers.has(pid)) {
       const packetClass = Socket.handlers.get(pid)
