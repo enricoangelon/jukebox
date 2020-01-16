@@ -134,6 +134,8 @@ export class RakNetSession {
     if (this.state === RakNetSession.STATE_CONNECTING) {
       if (pid === Identifiers.ID_CONNECTION_REQUEST) {
         let stream = new BinaryStream(packet.getBuffer())
+        // stream.getByte() // fix index
+
         this.clientID = stream.getLong()
         let pk = new ConnectionRequestAccepted(rinfo, stream, undefined)
 
@@ -156,7 +158,7 @@ export class RakNetSession {
         this.state = RakNetSession.STATE_CONNECTED
 
         let stream = new BinaryStream(packet.getBuffer())
-        stream.getByte() // increase offset
+        // stream.getByte() // increase offset
         let address = stream.getAddress()
 
         if (address.port === Jukebox.getPort()) {

@@ -4,13 +4,14 @@ import { Jukebox } from '@jukebox/core'
 import { RakNetSession } from '../session'
 
 export default class OpenConnectionReply2 extends Packet implements IPacket {
-  public pid = Identifiers.ID_OPEN_CONNECTION_REPLY_2
   public static pid = Identifiers.ID_OPEN_CONNECTION_REQUEST_2
 
   public clientPort: number = this.rinfo.port
   public mtuSize: number = this.inputStream.getShort()
 
   public encode() {
+    this.stream.putByte(Identifiers.ID_OPEN_CONNECTION_REPLY_2)
+
     this.stream.putMagic()
     this.stream.putLong(Jukebox.serverID)
     this.stream.putShort(this.clientPort)

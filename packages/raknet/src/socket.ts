@@ -35,7 +35,7 @@ export class Socket {
         .map(i => i.default)
         // Ignore modules that don't export a default class
         // and packets with undefined `pid`
-        .filter(i => !!i && i.pid != -1) // make new way
+        .filter(i => !!i && i.pid != -129)
         .forEach(i =>
           Socket.handlers.set(i.pid as number, i as IPacketConstructor)
         )
@@ -59,6 +59,7 @@ export class Socket {
         return // useless but it's to make typescript happy
       }
       const packet = new packetClass(rinfo, stream)
+      typeof packet.decode === 'function' ? packet.decode() : ''
       packet.encode()
       Socket.sendBuffer(packet.getBuffer(), rinfo.port, rinfo.address)
     } else if (RakNetSession.sessions.has(rinfo.address)) {
