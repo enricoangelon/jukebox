@@ -6,6 +6,8 @@ import { Jukebox } from '../jukebox'
 
 export class PacketHandler {
   public handleBatched(rinfo: RemoteInfo, packet: Encapsulated) {
+    Jukebox.getLogger().debug(`Handling batched`)
+
     let batched = new Batched()
     batched.setBuffer(packet.getBuffer())
     batched.decode()

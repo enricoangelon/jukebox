@@ -44,13 +44,13 @@ export class Batched extends Datagram {
     // make a packet pool or something
     // to create packet by packet id, so get packet class
     // and set to packet class the buffer given
-    if (this.payload.getBuffer().length === 0) {
-      return
-    }
+    // if (this.payload.getBuffer().length === 0) {
+    //  return
+    // }
 
     let pid = this.getBuffer()[0]
 
-    let pk = McpeLogin
+    let pk = new McpeLogin()
 
     if (pk instanceof Datagram) {
       if (!pk.allowBatching) {
@@ -58,9 +58,7 @@ export class Batched extends Datagram {
       }
 
       pk.setBuffer(this.getBuffer(), 1)
-      packetHandler.handleDatagram(pk)
-    }
-    if (pid === 0x01) {
+      packetHandler.handleDatagram(rinfo, pk)
     }
   }
 }
