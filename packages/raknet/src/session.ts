@@ -125,7 +125,7 @@ export class RakNetSession {
     if (!(packet instanceof Encapsulated)) return
     let pid = packet.getBuffer()[0]
     Jukebox.getLogger().debug(
-      `Recived EncapsulatedPacket with id ${pid} from ${this.address}!`
+      `Recived EncapsulatedPacket with id ${pid} (hex: 0xTODO) from ${this.address}!`
     )
 
     if (packet.hasSplit) {
@@ -163,14 +163,14 @@ export class RakNetSession {
         stream.getByte() // increase offset
         let address = stream.getAddress()
 
-        if (address.port === Jukebox.getPort()) {
+        if (address.port === Jukebox.getPort() /* port checking */) {
           // port checking todo (not important)
           Jukebox.getLogger().debug(
             `Successfully connected with ${this.address}:${this.port}`
           )
           this.state = RakNetSession.STATE_CONNECTED
 
-          this.player = new Player() // idk, my idea is to assing a session / player, so from session i can get player
+          this.player = new Player(rinfo) // idk, my idea is to assing a session / player, so from session i can get player
 
           this.sendPing(rinfo)
         }
@@ -183,7 +183,7 @@ export class RakNetSession {
         let session = RakNetSession.sessions.get(rinfo.address)
         if (session instanceof RakNetSession) {
           if (session.player && session.player instanceof Player) {
-            session.player.packetHandler.handleBatched(rinfo, packet) // fix this error...
+            session.player.packetHandler.handleBatched(packet.getBuffer())
           }
         }
       }

@@ -4,10 +4,9 @@ import { Jukebox } from '../../jukebox'
 import * as Zlib from 'zlib' // https://github.com/nodeca/pako
 import { PacketHandler } from '../packet-handler'
 import { RemoteInfo } from 'dgram'
-import { McpeLogin } from '../packets/mcpe-login'
 
 export class Batched extends Datagram {
-  public pid: number = 0xfe
+  public pid: number = 0xfe // MCPE Wrapper
 
   public allowBatching: boolean = false
   public allowBeforeLogin: boolean = true
@@ -40,25 +39,26 @@ export class Batched extends Datagram {
     this.append(packedData)
   }
 
-  public handle(rinfo: RemoteInfo, packetHandler: PacketHandler) {
-    // make a packet pool or something
-    // to create packet by packet id, so get packet class
-    // and set to packet class the buffer given
-    // if (this.payload.getBuffer().length === 0) {
-    //  return
-    // }
+  public handle(packetHandler: PacketHandler): boolean {
+    if (this.payload.getBuffer().length == 0) {
+      return false // not handled if empty payload
+    }
 
-    let pid = this.getBuffer()[0]
+    let pkBuffer = this.payload.get(this.payload.getUnsignedVarInt()) // must be one packet / time
+    let pid = pkBuffer[0]
 
-    let pk = new McpeLogin()
+    // get packet and set buffer to it
+    let pk = Jukebox.packetPool.get(pid)
 
     if (pk instanceof Datagram) {
       if (!pk.allowBatching) {
-        Jukebox.getLogger().error(`Invalid batched ${pk.getName()}`)
+        Jukebox.getLogger().error(`Invalid batched packet: ${pk.getName()}`)
       }
 
-      pk.setBuffer(this.getBuffer(), 1)
-      packetHandler.handleDatagram(rinfo, pk)
+      pk.setBuffer(pkBuffer)
+      packetHandler.handleDatagram(pk)
     }
+
+    return true
   }
 }

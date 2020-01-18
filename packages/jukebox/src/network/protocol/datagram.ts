@@ -1,5 +1,9 @@
 import { BinaryStream } from '@jukebox/binarystream'
 import { Jukebox } from '../../jukebox'
+import { PacketHandler } from '../packet-handler'
+import { RemoteInfo } from 'dgram'
+
+export interface IDatagram {}
 
 export class Datagram extends BinaryStream {
   // we can do it in raknet too, would be better
@@ -17,7 +21,7 @@ export class Datagram extends BinaryStream {
 
   public decodePayload() {}
 
-  public decodeHeader() {
+  protected decodeHeader() {
     // need to make hack for pid, i need public and static access
     let decodedPID = this.getUnsignedVarInt()
     if (decodedPID !== this.pid) {
@@ -34,12 +38,16 @@ export class Datagram extends BinaryStream {
 
   public encodePayload() {}
 
-  public encodeHeader() {
+  protected encodeHeader() {
     this.putUnsignedVarInt(this.pid)
   }
 
   public encode() {
     this.encodeHeader()
     this.encodePayload()
+  }
+
+  public handle(packetHandler: PacketHandler): boolean {
+    return false
   }
 }

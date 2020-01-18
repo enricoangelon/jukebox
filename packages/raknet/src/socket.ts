@@ -42,7 +42,7 @@ export class Socket {
         )
 
       Jukebox.getLogger().info(
-        `Loaded OfflineMessage ${Socket.handlers.size} handlers`
+        `Loaded ${Socket.handlers.size} OfflineMessage handlers`
       )
     } catch (err) {
       Jukebox.getLogger().fatal('Could not load packets', err)
@@ -66,7 +66,6 @@ export class Socket {
         return // useless but it's to make typescript happy
       }
       const packet = new packetClass(rinfo, stream)
-      typeof packet.decode === 'function' ? packet.decode() : ''
       packet.encode()
       Socket.sendBuffer(packet.getBuffer(), rinfo.port, rinfo.address)
     } else if (RakNetSession.sessions.has(rinfo.address)) {

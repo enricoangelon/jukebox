@@ -22,6 +22,10 @@ export class BinaryStream {
     this.append(Buffer.from([v & 0xff]))
   }
 
+  public getLInt() {
+    return this.buffer.readInt32LE(this.increaseOffset(4))
+  }
+
   public getLong() {
     return (
       (this.buffer.readUInt32BE(this.increaseOffset(4)) << 8) +
@@ -66,6 +70,10 @@ export class BinaryStream {
     }
 
     return 0
+  }
+
+  public get(len: number) {
+    return this.buffer.slice(this.offset, this.increaseOffset(len, true))
   }
 
   public putUnsignedVarInt(v: number) {
@@ -169,8 +177,12 @@ export class BinaryStream {
     }
   }
 
-  public increaseOffset(v: number) {
-    return (this.offset += v) - v
+  public getString(): string {
+    return this.getUnsignedVarInt().toString()
+  }
+
+  public increaseOffset(v: number, ret: boolean = false) {
+    return ret === true ? (this.offset += v) : (this.offset += v) - v
   }
 
   public feof() {

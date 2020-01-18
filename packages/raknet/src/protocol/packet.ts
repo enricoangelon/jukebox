@@ -23,6 +23,8 @@ export class Packet {
 
   //USUAL PACKET FORMAT: xx 00 00 00 00 where xx is pid
 
+  //Magic is sent to let the game know is a offline message
+
   constructor(
     rinfo: RemoteInfo,
     inputStream?: BinaryStream,
