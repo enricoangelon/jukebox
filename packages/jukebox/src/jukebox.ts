@@ -2,10 +2,13 @@ import { Config } from './config'
 import { resolve, join } from 'path'
 import { Logger } from './logger'
 import { RakNetInstancer } from './network/raknet-instancer'
-import { promisify } from 'util'
-import { readdir } from 'fs'
 import { Datagram } from './network/protocol/datagram'
 import { McpeLogin } from './network/packets/mcpe-login'
+import { McpePlayStatus } from './network/packets/mcpe-play-status'
+import { McpeResourcePacksInfo } from './network/packets/mcpe-resource-packs-info'
+import { Batched } from './network/protocol/batched'
+import { Socket } from '@jukebox/raknet'
+import { RemoteInfo } from 'dgram'
 
 export class Jukebox {
   private static instance: Jukebox
@@ -37,8 +40,13 @@ export class Jukebox {
 
   private async loadPacketPool() {
     Jukebox.packetPool.set(0x01, new McpeLogin())
+    Jukebox.packetPool.set(0x02, new McpePlayStatus())
+    Jukebox.packetPool.set(0x06, new McpeResourcePacksInfo())
 
-    /* try {
+    Jukebox.getLogger().info(
+      `Loaded ${Jukebox.packetPool.size} MCPE packet handlers`
+    )
+    /* try { //not working
       const dir = join(__dirname, 'network/packets')
       const files = await promisify(readdir)(dir)
 
@@ -51,7 +59,7 @@ export class Jukebox {
 
       imports
         .forEach(i =>
-          Jukebox.packetPool.set(i.pid as number, i as Datagram)
+          Jukebox.packetPool.set(i.NETWORK_ID as number, i as Datagram)
         )
 
       Jukebox.getLogger().info(
@@ -60,6 +68,14 @@ export class Jukebox {
     } catch (err) {
       Jukebox.getLogger().fatal('Could not load packets', err)
     }*/
+  }
+
+  public static sendPacket(packet: Datagram | Batched, rinfo: RemoteInfo) {
+    if (!packet.encoded) {
+      packet.encode()
+    }
+
+    Socket.sendBuffer(packet.getBuffer(), rinfo.port, rinfo.address)
   }
 
   public shutdown() {

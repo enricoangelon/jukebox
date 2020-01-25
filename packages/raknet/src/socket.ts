@@ -54,9 +54,9 @@ export class Socket {
 
     if (pid !== Identifiers.ID_UNCONNECTED_PING) {
       // used just in development to remove unconnected ping spam
-      Jukebox.getLogger().debug(
+      /* Jukebox.getLogger().debug(
         `Recived a packet from ${rinfo.address}:${rinfo.port} with id: ${pid} and lentgh of ${msg.length}!`
-      )
+      ) */
     }
 
     if (Socket.handlers.has(pid)) {

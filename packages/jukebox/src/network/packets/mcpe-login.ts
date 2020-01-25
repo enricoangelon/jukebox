@@ -1,11 +1,11 @@
 import { Datagram } from '../protocol/datagram'
 import { BinaryStream } from '@jukebox/binarystream'
-import { JWT } from '../utils/jwt'
 import { PacketHandler } from '../packet-handler'
+import * as jwt_decode from 'jwt-decode'
+import { LoginToken } from '../types/login-token'
 
 export class McpeLogin extends Datagram {
-  public pid: number = 0x01
-  public static pid: number = 0x01
+  public static readonly NETWORK_ID: number = 0x01
 
   // decoded values
   public XUID: string | undefined
@@ -29,7 +29,7 @@ export class McpeLogin extends Datagram {
     let chainData = JSON.parse(buffer.get(buffer.getLInt()).toString())
 
     for (let i = 0; i < chainData.chain.length; i++) {
-      let decodedChain = JWT.decodeJWT(chainData.chain[i])
+      let decodedChain = jwt_decode<LoginToken>(chainData.chain[i])
 
       if (decodedChain.extraData) {
         this.XUID = decodedChain.extraData.XUID
@@ -41,7 +41,9 @@ export class McpeLogin extends Datagram {
       // we have also certificateAuthority: true, maybe related to premium account or not, exp: integer, nbf: integers
     }
 
-    let decodedJWT = JWT.decodeJWT(buffer.get(buffer.getLInt()).toString())
+    let decodedJWT = jwt_decode<LoginToken>(
+      buffer.get(buffer.getLInt()).toString()
+    )
     this.clientRandomID = decodedJWT.ClientRandomID
     this.serverAddress = decodedJWT.ServerAddress
     this.languageCode = decodedJWT.LanguageCode

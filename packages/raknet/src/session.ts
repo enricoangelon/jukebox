@@ -124,9 +124,9 @@ export class RakNetSession {
   public handleEncapsulated(rinfo: RemoteInfo, packet: Encapsulated) {
     if (!(packet instanceof Encapsulated)) return
     let pid = packet.getBuffer()[0]
-    Jukebox.getLogger().debug(
+    /* Jukebox.getLogger().debug(
       `Recived EncapsulatedPacket with id ${pid} (hex: 0xTODO) from ${this.address}!`
-    )
+    )*/
 
     if (packet.hasSplit) {
       this.handleSplit(rinfo, packet)
@@ -175,8 +175,8 @@ export class RakNetSession {
           this.sendPing(rinfo)
         }
       }
-    } else if (pid === 0xfe && this.state === RakNetSession.STATE_CONNECTED) {
-      // minecraft header
+    } else if (pid === 0xfe) {
+      // minecraft wrapper
       Jukebox.getLogger().debug(`Got a Minecraft related packet`)
 
       if (RakNetSession.sessions.has(rinfo.address)) {

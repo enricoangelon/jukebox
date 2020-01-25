@@ -72,6 +72,42 @@ export class BinaryStream {
     return 0
   }
 
+  public putLLong(v: number) {
+    let MAX_UINT32 = 0xffffffff
+
+    let buf = Buffer.alloc(8)
+    buf.writeUInt32LE(v & MAX_UINT32, 0)
+    buf.writeUInt32LE(~~(v / MAX_UINT32), 4)
+    this.append(buf)
+  }
+
+  public putLShort(v: number) {
+    let buf = Buffer.alloc(2)
+    buf.writeUInt16LE(v, 0)
+    this.append(buf)
+  }
+
+  public reset() {
+    this.buffer = Buffer.alloc(0)
+    this.offset = 0
+  }
+
+  public putBool(v: boolean) {
+    this.putByte(v === true ? 1 : 0)
+  }
+
+  public getLLong() {
+    return this.buffer.readUInt32LE(0) + (this.buffer.readUInt32LE(4) << 8)
+  }
+
+  public getLShort() {
+    return this.buffer.readUInt16LE(this.increaseOffset(2))
+  }
+
+  public getBool() {
+    return this.getByte() !== 0
+  }
+
   public get(len: number) {
     return this.buffer.slice(this.offset, this.increaseOffset(len, true))
   }

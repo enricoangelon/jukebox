@@ -1,7 +1,8 @@
 import { Socket } from '@jukebox/raknet'
+import { Datagram } from './protocol/datagram'
 
 export class RakNetInstancer {
   public socket = new Socket()
 
-  public static sendPacket() {} // here we go with basic server implementation :D!
+  public static sendPacket(packet: Datagram) {}
 }

@@ -1,11 +1,10 @@
-import { RemoteInfo } from 'dgram'
 import { Batched } from './protocol/batched'
-import { Encapsulated } from '@jukebox/raknet'
 import { Datagram } from './protocol/datagram'
 import { Jukebox } from '../jukebox'
 import { Player } from '../player'
 import { McpeLogin } from './packets/mcpe-login'
 import { McpePlayStatus } from './packets/mcpe-play-status'
+import { McpeResourcePacksInfo } from './packets/mcpe-resource-packs-info'
 
 export class PacketHandler {
   private player: Player
@@ -49,6 +48,10 @@ export class PacketHandler {
   }
 
   public handleMcpePlayStatus(packet: McpePlayStatus) {
+    return false
+  }
+
+  public handleResourcePacksInfo(packet: McpeResourcePacksInfo) {
     return false
   }
 }

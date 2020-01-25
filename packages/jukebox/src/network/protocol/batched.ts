@@ -3,10 +3,9 @@ import { BinaryStream } from '@jukebox/binarystream'
 import { Jukebox } from '../../jukebox'
 import * as Zlib from 'zlib' // https://github.com/nodeca/pako
 import { PacketHandler } from '../packet-handler'
-import { RemoteInfo } from 'dgram'
 
 export class Batched extends Datagram {
-  public pid: number = 0xfe // MCPE Wrapper
+  public static readonly NETWORK_ID: number = 0xfe // MCPE Wrapper
 
   public allowBatching: boolean = false
   public allowBeforeLogin: boolean = true
@@ -14,11 +13,24 @@ export class Batched extends Datagram {
 
   public payload = new BinaryStream()
 
+  public addPacket(packet: Datagram) {
+    if (!packet.allowBatching) {
+      Jukebox.getLogger().error(`${packet.getName()} can't be batched!`)
+    }
+
+    if (!packet.encoded) {
+      packet.encode()
+    }
+
+    this.payload.putUnsignedVarInt(packet.getBuffer().length)
+    this.payload.append(packet.getBuffer())
+  }
+
   public decodeHeader() {
-    let decodedPID = this.getByte()
-    if (decodedPID !== this.pid) {
+    let [decodedPID, Pid] = [this.getByte(), this.getPacketID()]
+    if (decodedPID !== Pid) {
       Jukebox.getLogger().error(
-        `Got a packet with wrong PID, expecting: ${this.pid}, got: ${decodedPID}!`
+        `Got a packet with wrong PID, expecting: ${Pid}, got: ${decodedPID}!`
       )
     }
   }
@@ -29,7 +41,7 @@ export class Batched extends Datagram {
   }
 
   public encodeHeader() {
-    this.putByte(this.pid)
+    this.putByte(this.getPacketID())
   }
 
   public encodePayload() {
