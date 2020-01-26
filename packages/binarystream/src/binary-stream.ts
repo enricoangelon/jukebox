@@ -170,6 +170,68 @@ export class BinaryStream {
     }
   }
 
+  public getLFloat() {
+    return this.buffer.readFloatLE(this.increaseOffset(4))
+  }
+
+  public getVarInt() {
+    let raw = this.getUnsignedVarInt()
+    let tmp = (((raw << 63) >> 63) ^ raw) >> 1
+    return tmp ^ (raw & (1 << 63))
+  }
+
+  public getVarLong() {
+    let raw = this.getUnsignedVarLong()
+    let tmp = (((raw << 63) >> 63) ^ raw) >> 1
+    return tmp ^ (raw & (1 << 63))
+  }
+
+  public getUnsignedVarLong() {
+    let value = 0
+    for (let i = 0; i <= 63; i += 7) {
+      let b = this.getByte()
+      value |= (b & 0x7f) << i
+
+      if ((b & 0x80) === 0) {
+        return value
+      }
+    }
+    return 0
+  }
+
+  public putVarInt(v: number) {
+    v <<= 32 >> 32
+    return this.putUnsignedVarInt((v << 1) ^ (v >> 31))
+  }
+
+  public putVarLong(v: number) {
+    return this.putUnsignedVarLong((v << 1) ^ (v >> 63))
+  }
+
+  public putLFloat(v: number) {
+    let buf = Buffer.alloc(8)
+    let bytes = buf.writeFloatLE(v, 0)
+    this.append(buf.slice(0, bytes))
+  }
+
+  public putUnsignedVarLong(v: number) {
+    for (let i = 0; i < 10; i++) {
+      if (v >> 7 !== 0) {
+        this.putByte(v | 0x80)
+      } else {
+        this.putByte(v & 0x7f)
+        break
+      }
+      v >>= 7
+    }
+  }
+
+  public putLInt(v: number) {
+    let buf = Buffer.alloc(4)
+    buf.writeInt32LE(v, 0)
+    this.append(buf)
+  }
+
   public putInt(v: number) {
     let buf = Buffer.alloc(4)
     buf.writeInt32BE(v, 0)

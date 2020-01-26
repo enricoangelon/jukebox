@@ -5,6 +5,7 @@ import { RemoteInfo } from 'dgram'
 import { Socket } from './socket'
 import { BinaryStream } from '@jukebox/binarystream'
 import { Datagram } from './protocol/datagram'
+import { Datagram as DataPacket } from '@Jukebox/core'
 import { Encapsulated } from './protocol/encapsulated'
 import { PacketReliability } from './protocol/reliability'
 import { Identifiers } from './protocol/identifiers'
@@ -190,6 +191,28 @@ export class RakNetSession {
     } else {
       Jukebox.getLogger().debug(`Got unhandled packet with id ${pid}`)
     }
+  }
+
+  public static sendDgramPacket(packet: DataPacket, rinfo: RemoteInfo) {
+    packet.encode()
+
+    //TODO: reliability
+    let pk = new Encapsulated(
+      rinfo,
+      new BinaryStream(packet.getBuffer()),
+      new BinaryStream(packet.getBuffer())
+    )
+    pk.reliability = PacketReliability.UNRELIABLE
+    pk.orderChannel = 0
+
+    let dgram = new Datagram(rinfo, undefined, undefined)
+    dgram.packets.push(pk)
+    this.sendPacket(dgram, rinfo)
+  }
+
+  public static sendPacket(packet: DataPacket | Datagram, rinfo: RemoteInfo) {
+    packet.encode()
+    Socket.sendBuffer(packet.getBuffer(), rinfo.port, rinfo.address)
   }
 
   public sendPing(

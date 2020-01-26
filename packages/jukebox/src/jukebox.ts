@@ -3,12 +3,20 @@ import { resolve, join } from 'path'
 import { Logger } from './logger'
 import { RakNetInstancer } from './network/raknet-instancer'
 import { Datagram } from './network/protocol/datagram'
-import { McpeLogin } from './network/packets/mcpe-login'
-import { McpePlayStatus } from './network/packets/mcpe-play-status'
-import { McpeResourcePacksInfo } from './network/packets/mcpe-resource-packs-info'
+import { McpeLogin } from './network/packets/login'
+import { McpePlayStatus } from './network/packets/play-status'
+import { McpeResourcePacksInfo } from './network/packets/resource-packs-info'
 import { Batched } from './network/protocol/batched'
 import { Socket } from '@jukebox/raknet'
 import { RemoteInfo } from 'dgram'
+import { McpeClientCacheStatus } from './network/packets/client-cache-status'
+import { McpeResourcePackClientResponse } from './network/packets/resource-pack-client-response'
+import { McpeResourcePackDataInfo } from './network/packets/resource-pack-data-info'
+import { McpeResourcePackStack } from './network/packets/resource-pack-stack'
+import { McpeStartGame } from './network/packets/start-game'
+import { McpeChunkRadiusUpdated } from './network/packets/chunk-radius-updated'
+import { McpeLevelChunk } from './network/packets/level-chunk'
+import { McpeRequestChunkRadius } from './network/packets/request-chunk-radius'
 
 export class Jukebox {
   private static instance: Jukebox
@@ -32,8 +40,8 @@ export class Jukebox {
   }
 
   public start() {
-    this.loadPacketPool()
     this.socketAdapter = new RakNetInstancer()
+    this.loadPacketPool()
 
     // TODO: Implement bootstrapping
   }
@@ -42,6 +50,14 @@ export class Jukebox {
     Jukebox.packetPool.set(0x01, new McpeLogin())
     Jukebox.packetPool.set(0x02, new McpePlayStatus())
     Jukebox.packetPool.set(0x06, new McpeResourcePacksInfo())
+    Jukebox.packetPool.set(0x07, new McpeResourcePackStack())
+    Jukebox.packetPool.set(0x08, new McpeResourcePackClientResponse())
+    Jukebox.packetPool.set(0x52, new McpeResourcePackDataInfo())
+    Jukebox.packetPool.set(0x81, new McpeClientCacheStatus())
+    Jukebox.packetPool.set(0x0b, new McpeStartGame())
+    Jukebox.packetPool.set(0x45, new McpeRequestChunkRadius())
+    Jukebox.packetPool.set(0x46, new McpeChunkRadiusUpdated())
+    Jukebox.packetPool.set(0x3a, new McpeLevelChunk())
 
     Jukebox.getLogger().info(
       `Loaded ${Jukebox.packetPool.size} MCPE packet handlers`

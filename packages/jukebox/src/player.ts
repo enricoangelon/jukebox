@@ -1,12 +1,16 @@
 import { IPlayer } from './player-interface'
 import { PacketHandler } from './network/packet-handler'
-import { McpePlayStatus } from './network/packets/mcpe-play-status'
+import { McpePlayStatus } from './network/packets/play-status'
 import { Socket } from '@jukebox/raknet'
 import { RemoteInfo } from 'dgram'
-import { McpeResourcePacksInfo } from './network/packets/mcpe-resource-packs-info'
+import { McpeResourcePacksInfo } from './network/packets/resource-packs-info'
 import { PlayStates } from './network/types/play-states'
-import { Batched } from './network/protocol/batched'
 import { Jukebox } from './jukebox'
+import { RakNetInstancer } from './network/raknet-instancer'
+import { McpeStartGame } from './network/packets/start-game'
+import { McpeLevelChunk } from './network/packets/level-chunk'
+import { Datagram } from './network/protocol/datagram'
+import { Chunk } from './level/chunk'
 
 export class Player implements IPlayer {
   public packetHandler: PacketHandler = new PacketHandler(this) // init autonomous packet handler per player
@@ -22,41 +26,58 @@ export class Player implements IPlayer {
   }
 
   public processJoin() {
+    let pk
     // send play status
-    let pk, batched
     pk = new McpePlayStatus()
-    pk.status = PlayStates.LOGIN_SUCCESS // login success
-    pk.encode()
-    batched = new Batched()
-    batched.addPacket(pk)
-    batched.encode()
-    Jukebox.sendPacket(batched, this.rinfo)
-
-    // attempt 2
-    pk = new McpePlayStatus()
-    pk.status = PlayStates.LOGIN_SUCCESS // login success
-    batched = new Batched(pk.getBuffer())
-    batched.encode()
-    Socket.sendBuffer(batched.getBuffer(), this.rinfo.port, this.rinfo.address)
+    pk.status = PlayStates.LOGIN_SUCCESS
+    RakNetInstancer.sendDataPacket(pk, this.rinfo)
 
     // resource packs info [temporary data]
     // this packet is not fully documented yet
     pk = new McpeResourcePacksInfo()
     pk.resourcePackList = []
     pk.isRequired = false
-    pk.encode()
-    batched = new Batched()
-    batched.addPacket(pk)
-    batched.encode()
-    Jukebox.sendPacket(batched, this.rinfo)
+    RakNetInstancer.sendDataPacket(pk, this.rinfo)
+  }
 
-    // attempt 2
-    pk = new McpeResourcePacksInfo()
-    pk.resourcePackList = []
-    pk.isRequired = false
-    pk.encode()
-    batched = new Batched(pk.getBuffer())
-    batched.encode()
-    Socket.sendBuffer(batched.getBuffer(), this.rinfo.port, this.rinfo.address)
+  public continueJoinProcess() {
+    Jukebox.getLogger().info(`${this.username} is loggin in...`)
+
+    let pk = new McpeStartGame()
+    pk.entityUniqueId = 1
+    pk.entityRuntimeId = 1
+    pk.playerGamemode = 1
+
+    pk.playerPosition = [0, 10, 0]
+
+    pk.pitch = 0
+    pk.yaw = 0
+    pk.seed = 0xdeadbeef
+    pk.dimension = 0
+    pk.worldGamemode = 1
+    pk.difficulty = 1
+    pk.spawnX = 0.0
+    pk.spawnY = 10.0
+    pk.spawnZ = 0.0
+    pk.hasAchievementsDisabled = false
+    pk.time = 0
+    pk.eduEditionOffer = 0
+    pk.rainLevel = 0
+    pk.lightningLevel = 0
+    pk.commandsEnabled = false
+    pk.levelId = ''
+    pk.worldName = ''
+    RakNetInstancer.sendDataPacket(pk, this.rinfo)
+  }
+
+  public sendChunk(chunk: Chunk) {
+    let pk
+    pk = new McpeLevelChunk()
+    pk.chunkX = chunk.x
+    pk.chunkZ = chunk.z
+    pk.subChunkCount = chunk.getSubChunkSendCount()
+    pk.cacheEnabled = false
+    pk.extraPayload = chunk.toBinary().toString()
+    RakNetInstancer.sendDataPacket(pk, this.rinfo)
   }
 }

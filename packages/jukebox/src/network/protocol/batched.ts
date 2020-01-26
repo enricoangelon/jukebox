@@ -13,7 +13,7 @@ export class Batched extends Datagram {
 
   public payload = new BinaryStream()
 
-  public addPacket(packet: Datagram) {
+  public addPacket(packet: Datagram | Batched) {
     if (!packet.allowBatching) {
       Jukebox.getLogger().error(`${packet.getName()} can't be batched!`)
     }
@@ -51,6 +51,14 @@ export class Batched extends Datagram {
     this.append(packedData)
   }
 
+  public getPackets() {
+    let pks = []
+    while (!this.payload.feof()) {
+      pks.push(this.payload.get(this.payload.getUnsignedVarInt()))
+    }
+    return pks
+  }
+
   public handle(packetHandler: PacketHandler): boolean {
     if (this.payload.getBuffer().length == 0) {
       return false // not handled if empty payload
@@ -58,6 +66,8 @@ export class Batched extends Datagram {
 
     let pkBuffer = this.payload.get(this.payload.getUnsignedVarInt()) // must be one packet / time
     let pid = pkBuffer[0]
+
+    console.log(pid)
 
     // get packet and set buffer to it
     let pk = Jukebox.packetPool.get(pid)

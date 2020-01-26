@@ -1,5 +1,5 @@
 import { Datagram } from '../protocol/datagram'
-import { ResourcePack } from '../types/resource-pack'
+import { ResourcePack } from '../types/resource-packs/resource-pack'
 import { PacketHandler } from '../packet-handler'
 
 export class McpeResourcePacksInfo extends Datagram {

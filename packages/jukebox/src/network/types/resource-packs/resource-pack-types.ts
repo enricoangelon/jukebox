@@ -1,0 +1,11 @@
+export enum ResourcePackTypes {
+  INVALID = 0,
+  ADDON,
+  CACHED,
+  COPY_PROTECTED,
+  BEHAVIORS,
+  PERSONA_PIECE,
+  RESOURCES,
+  SKINS,
+  WORLD_TEMPLATE,
+}
