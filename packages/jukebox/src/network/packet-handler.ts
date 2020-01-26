@@ -17,6 +17,7 @@ import { McpeChunkRadiusUpdated } from './packets/chunk-radius-updated'
 import { PlayStates } from './types/play-states'
 import { McpeLevelChunk } from './packets/level-chunk'
 import { Chunk } from '../level/chunk'
+import { AsyncResource } from 'async_hooks'
 
 export class PacketHandler {
   private player: Player
@@ -113,13 +114,27 @@ export class PacketHandler {
     return false
   }
 
-  public handleMcpeRequestChunkRadius(packet: McpeRequestChunkRadius): boolean {
+  public async handleMcpeRequestChunkRadius(
+    packet: McpeRequestChunkRadius
+  ): Promise<boolean> {
     let pk, radius
     radius = packet.radius
     pk = new McpeChunkRadiusUpdated()
     pk.radius = radius
     RakNetInstancer.sendDataPacket(pk, this.player.rinfo)
 
+    await this.sendChunks(radius)
+
+    pk = new McpePlayStatus()
+    pk.status = PlayStates.PLAYER_SPAWN
+    RakNetInstancer.sendDataPacket(pk, this.player.rinfo)
+
+    Jukebox.getLogger().debug('Spawning player...')
+
+    return true
+  }
+
+  public async sendChunks(radius: number) {
     for (let chunkX = -radius; chunkX <= radius; chunkX++) {
       for (let chunkZ = -radius; chunkZ <= radius; chunkZ++) {
         let chunk = new Chunk(chunkX, chunkZ)
@@ -137,14 +152,6 @@ export class PacketHandler {
         this.player.sendChunk(chunk)
       }
     }
-
-    pk = new McpePlayStatus()
-    pk.status = PlayStates.PLAYER_SPAWN
-    RakNetInstancer.sendDataPacket(pk, this.player.rinfo)
-
-    Jukebox.getLogger().debug('Spawning player...')
-
-    return true
   }
 
   public handleMcpeChunkRadiusUpdated(

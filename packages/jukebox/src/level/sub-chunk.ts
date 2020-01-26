@@ -2,7 +2,7 @@ export interface SubChunkInterface {
   isEmpty(): boolean
   getBlockId(x: number, y: number, z: number): number
   setBlock(): void
-  setBlockId(): void
+  setBlockId(x: number, y: number, z: number): void
   getBlockData(x: number, y: number, z: number, data: number): number
   setBlockData(): void
   getBlockLight(): number
@@ -55,8 +55,8 @@ export class SubChunk implements SubChunkInterface {
     throw new Error('Method not implemented.')
   }
 
-  public setBlockId(): void {
-    throw new Error('Method not implemented.')
+  public setBlockId(x: number, y: number, z: number): void {
+    this.blockIds.push(SubChunk.getIdIndex(x, y, z))
   }
 
   public getBlockData(x: number, y: number, z: number, data: number) {

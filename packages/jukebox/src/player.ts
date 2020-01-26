@@ -77,7 +77,7 @@ export class Player implements IPlayer {
     pk.chunkZ = chunk.z
     pk.subChunkCount = chunk.getSubChunkSendCount()
     pk.cacheEnabled = false
-    pk.extraPayload = chunk.toBinary().toString()
+    pk.extraPayload = chunk.toBinary().toString('hex')
     RakNetInstancer.sendDataPacket(pk, this.rinfo)
   }
 }
