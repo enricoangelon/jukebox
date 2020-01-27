@@ -1,6 +1,6 @@
-import { SubChunkInterface } from './sub-chunk'
+import { ISubChunk } from './i-sub-chunk'
 
-export class EmptySubChunk implements SubChunkInterface {
+export class EmptySubChunk implements ISubChunk {
   public isEmpty() {
     return true
   }

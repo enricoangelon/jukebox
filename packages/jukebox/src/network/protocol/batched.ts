@@ -1,7 +1,8 @@
-import { Datagram } from './datagram'
 import { BinaryStream } from '@jukebox/binarystream'
+import * as Zlib from 'zlib'
+
+import { Datagram } from './datagram'
 import { Jukebox } from '../../jukebox'
-import * as Zlib from 'zlib' // https://github.com/nodeca/pako
 import { PacketHandler } from '../packet-handler'
 
 export class Batched extends Datagram {
@@ -51,14 +52,6 @@ export class Batched extends Datagram {
     this.append(packedData)
   }
 
-  public getPackets() {
-    let pks = []
-    while (!this.payload.feof()) {
-      pks.push(this.payload.get(this.payload.getUnsignedVarInt()))
-    }
-    return pks
-  }
-
   public handle(packetHandler: PacketHandler): boolean {
     if (this.payload.getBuffer().length == 0) {
       return false // not handled if empty payload
@@ -66,8 +59,6 @@ export class Batched extends Datagram {
 
     let pkBuffer = this.payload.get(this.payload.getUnsignedVarInt()) // must be one packet / time
     let pid = pkBuffer[0]
-
-    console.log(pid)
 
     // get packet and set buffer to it
     let pk = Jukebox.packetPool.get(pid)

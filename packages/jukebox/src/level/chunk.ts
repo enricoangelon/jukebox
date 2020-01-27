@@ -1,12 +1,14 @@
+import { BinaryStream } from '@jukebox/binarystream'
+
 import { EmptySubChunk } from './empty-sub-chunk'
 import { SubChunk } from './sub-chunk'
-import { BinaryStream } from '@jukebox/binarystream'
+import { ISubChunk } from './i-sub-chunk'
 
 export class Chunk {
   public x: number = 0
   public z: number = 0
   public height: number = 16
-  public subChunks = new Map()
+  public subChunks: Map<number, ISubChunk>
   public heightMap: number[] = []
   public biomes: number[] = []
   public hasChanged: boolean = false
@@ -24,10 +26,9 @@ export class Chunk {
     this.subChunks = subChunks
 
     for (let y = 0; y < this.height; y++) {
-      this.subChunks.set(
-        y,
-        subChunks.has(y) ? subChunks.get(y) : new EmptySubChunk()
-      )
+      if (!this.subChunks.get(y)) {
+        this.subChunks.set(y, new EmptySubChunk())
+      }
     }
 
     if (heightMap.length === 256) {
@@ -82,7 +83,7 @@ export class Chunk {
   }
 
   public setBlockId(x: number, y: number, z: number, blockId: number) {
-    if (this.getSubChunk(y >> 4, true).setBlockId(x, y & 0x0f, z, blockId)) {
+    if (this.getSubChunk(y >> 4, true)!.setBlockId(x, y & 0x0f, z, blockId)) {
       this.hasChanged = true
     }
   }
@@ -94,7 +95,7 @@ export class Chunk {
     }
 
     for (let y = index; y >= 0; --y) {
-      let height = this.getSubChunk(y).getHighestBlock(x, z) | (y << 4)
+      let height = this.getSubChunk(y)!.getHighestBlock(x, z) | (y << 4)
       if (height !== -1) {
         return height
       }
@@ -121,7 +122,7 @@ export class Chunk {
     let subChunkCount = this.getFilledSubChunks()
 
     for (let y = 0; y < subChunkCount; ++y) {
-      stream.append(this.subChunks.get(y).toBinary())
+      stream.append(this.subChunks.get(y)!.toBinary())
     }
 
     for (let i = 0; i < this.biomes.length; i++) {

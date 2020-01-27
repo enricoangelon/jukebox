@@ -1,20 +1,6 @@
-export interface SubChunkInterface {
-  isEmpty(): boolean
-  getBlockId(x: number, y: number, z: number): number
-  setBlock(): void
-  setBlockId(x: number, y: number, z: number): void
-  getBlockData(x: number, y: number, z: number, data: number): number
-  setBlockData(): void
-  getBlockLight(): number
-  getBlockSkyLight(): number
-  setBlockSkyLight(): void
-  getHighestBlockId(): number
-  getHighestBlockData(x: number, z: number): number
-  getHighestBlock(): number
-  toBinary(): Buffer
-}
+import { ISubChunk } from './i-sub-chunk'
 
-export class SubChunk implements SubChunkInterface {
+export class SubChunk implements ISubChunk {
   public blockIds: number[] = []
   public blockData: number[] = []
   public blockLight: number[] = []
@@ -55,8 +41,11 @@ export class SubChunk implements SubChunkInterface {
     throw new Error('Method not implemented.')
   }
 
-  public setBlockId(x: number, y: number, z: number): void {
-    this.blockIds.push(SubChunk.getIdIndex(x, y, z))
+  public setBlockId(x: number, y: number, z: number): boolean {
+    if (this.blockIds.push(SubChunk.getIdIndex(x, y, z))) {
+      return true
+    }
+    return false
   }
 
   public getBlockData(x: number, y: number, z: number, data: number) {

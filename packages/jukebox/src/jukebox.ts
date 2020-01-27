@@ -1,14 +1,14 @@
+import { Socket } from '@jukebox/raknet'
+import { resolve } from 'path'
+import { RemoteInfo } from 'dgram'
+
+import { Batched } from './network/protocol/batched'
 import { Config } from './config'
-import { resolve, join } from 'path'
-import { Logger } from './logger'
-import { RakNetInstancer } from './network/raknet-instancer'
 import { Datagram } from './network/protocol/datagram'
+import { Logger } from './logger'
 import { McpeLogin } from './network/packets/login'
 import { McpePlayStatus } from './network/packets/play-status'
 import { McpeResourcePacksInfo } from './network/packets/resource-packs-info'
-import { Batched } from './network/protocol/batched'
-import { Socket } from '@jukebox/raknet'
-import { RemoteInfo } from 'dgram'
 import { McpeClientCacheStatus } from './network/packets/client-cache-status'
 import { McpeResourcePackClientResponse } from './network/packets/resource-pack-client-response'
 import { McpeResourcePackDataInfo } from './network/packets/resource-pack-data-info'
@@ -17,6 +17,7 @@ import { McpeStartGame } from './network/packets/start-game'
 import { McpeChunkRadiusUpdated } from './network/packets/chunk-radius-updated'
 import { McpeLevelChunk } from './network/packets/level-chunk'
 import { McpeRequestChunkRadius } from './network/packets/request-chunk-radius'
+import { RakNetInstancer } from './network/raknet-instancer'
 
 export class Jukebox {
   private static instance: Jukebox

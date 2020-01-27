@@ -17,7 +17,6 @@ import { McpeChunkRadiusUpdated } from './packets/chunk-radius-updated'
 import { PlayStates } from './types/play-states'
 import { McpeLevelChunk } from './packets/level-chunk'
 import { Chunk } from '../level/chunk'
-import { AsyncResource } from 'async_hooks'
 
 export class PacketHandler {
   private player: Player

@@ -16,7 +16,7 @@ export class McpeResourcePacksInfo extends Datagram {
     this.hasScripts = this.getBool()
     let behaviorPacklength = this.getLShort()
     for (let i = 0; i < behaviorPacklength; i++) {
-      this.behaviorPackList.push(<ResourcePack>{
+      this.behaviorPackList.push({
         packID: this.getString(),
         packVersion: this.getString(),
         packSize: this.getLLong(),
@@ -28,7 +28,7 @@ export class McpeResourcePacksInfo extends Datagram {
     }
     let resourcePackLength = this.getLShort()
     for (let i = 0; i < resourcePackLength; i++) {
-      this.resourcePackList.push(<ResourcePack>{
+      this.resourcePackList.push({
         packID: this.getString(),
         packVersion: this.getString(),
         packSize: this.getLLong(),

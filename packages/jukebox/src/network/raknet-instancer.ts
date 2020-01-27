@@ -1,6 +1,7 @@
 import { Socket, RakNetSession } from '@jukebox/raknet'
-import { Batched } from '../../lib/network/protocol/batched'
 import { RemoteInfo } from 'dgram'
+
+import { Batched } from '../../lib/network/protocol/batched'
 
 export class RakNetInstancer {
   public socket = new Socket() // initialize server main socket

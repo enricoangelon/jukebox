@@ -1,16 +1,15 @@
-import { IPlayer } from './player-interface'
-import { PacketHandler } from './network/packet-handler'
-import { McpePlayStatus } from './network/packets/play-status'
-import { Socket } from '@jukebox/raknet'
 import { RemoteInfo } from 'dgram'
-import { McpeResourcePacksInfo } from './network/packets/resource-packs-info'
-import { PlayStates } from './network/types/play-states'
+
+import { Chunk } from './level/chunk'
+import { IPlayer } from './player-interface'
 import { Jukebox } from './jukebox'
-import { RakNetInstancer } from './network/raknet-instancer'
+import { McpePlayStatus } from './network/packets/play-status'
+import { McpeResourcePacksInfo } from './network/packets/resource-packs-info'
 import { McpeStartGame } from './network/packets/start-game'
 import { McpeLevelChunk } from './network/packets/level-chunk'
-import { Datagram } from './network/protocol/datagram'
-import { Chunk } from './level/chunk'
+import { PacketHandler } from './network/packet-handler'
+import { PlayStates } from './network/types/play-states'
+import { RakNetInstancer } from './network/raknet-instancer'
 
 export class Player implements IPlayer {
   public packetHandler: PacketHandler = new PacketHandler(this) // init autonomous packet handler per player

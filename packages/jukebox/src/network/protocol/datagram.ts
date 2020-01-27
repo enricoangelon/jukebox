@@ -1,4 +1,5 @@
 import { BinaryStream } from '@jukebox/binarystream'
+
 import { Jukebox } from '../../jukebox'
 import { PacketHandler } from '../packet-handler'
 

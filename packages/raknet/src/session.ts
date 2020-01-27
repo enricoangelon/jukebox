@@ -1,16 +1,16 @@
-import { Jukebox } from '@jukebox/core'
+import { Jukebox, Player } from '@jukebox/core'
+import { Datagram as DataPacket } from '@Jukebox/core'
+import { BinaryStream } from '@jukebox/binarystream'
+import { RemoteInfo } from 'dgram'
+
 import { IPacket, Packet } from './protocol/packet'
 import { ConnectionRequestAccepted } from './packets/connection-request-accepted'
-import { RemoteInfo } from 'dgram'
 import { Socket } from './socket'
-import { BinaryStream } from '@jukebox/binarystream'
 import { Datagram } from './protocol/datagram'
-import { Datagram as DataPacket } from '@Jukebox/core'
 import { Encapsulated } from './protocol/encapsulated'
 import { PacketReliability } from './protocol/reliability'
 import { Identifiers } from './protocol/identifiers'
 import { ConnectedPing } from './packets/connected-ping'
-import { Player } from '@jukebox/core'
 
 export class RakNetSession {
   static readonly STATE_CONNECTING = 0

@@ -4,6 +4,7 @@ import { BinaryStream } from '@jukebox/binarystream'
 import { join } from 'path'
 import { promisify } from 'util'
 import { readdir } from 'fs'
+
 import { IPacketConstructor } from './protocol/packet'
 import { RakNetSession } from './session'
 import { Datagram } from './protocol/datagram'
