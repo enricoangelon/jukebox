@@ -1,6 +1,0 @@
-export const Identifiers = {
-  ID_CONNECTED_PING: 0x00,
-  ID_UNCONNECTED_PING: 0x01,
-
-  ID_OPEN_CONNECTION_REQUEST_1: 0x05,
-}

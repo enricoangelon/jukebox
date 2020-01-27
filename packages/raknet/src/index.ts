@@ -1,3 +1,5 @@
 export { Socket } from './socket'
-export { Utils } from './utils'
-export { Identifiers } from './identifiers'
+export { Identifiers } from './protocol/identifiers'
+export { Packet, IPacket } from './protocol/packet'
+export { Encapsulated } from './protocol/encapsulated'
+export { RakNetSession } from './session'
