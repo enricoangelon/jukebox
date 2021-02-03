@@ -7,12 +7,6 @@
   "license": "MIT",
   "author": "Jukebox authors",
   "dependencies": {
-    "@jukebox/dev-logger": "0.0.1",
-    "@jukebox/flat-world": "0.0.1",
-    "@jukebox/raknet": "0.0.1",
-    "jwt-decode": "2.2.0"
-  },
-  "devDependencies": {
-    "@types/jwt-decode": "2.2.1"
+    "@jukebox/raknet": "0.0.1"
   }
 }

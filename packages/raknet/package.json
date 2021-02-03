@@ -6,7 +6,7 @@
   "license": "MIT",
   "author": "Jukebox authors",
   "dependencies": {
-    "@jukebox/core": "0.0.1",
+    "@jukebox/dev-logger": "0.0.1",
     "@jukebox/binarystream": "0.0.1"
   }
 }
