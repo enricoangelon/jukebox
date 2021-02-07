@@ -1,4 +1,4 @@
-import { Logger } from '@jukebox/core'
+import { Logger } from './logger'
 
 export class DevLogger implements Logger {
   public info() {

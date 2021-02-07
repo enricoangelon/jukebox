@@ -1,4 +1,4 @@
-import { Logger } from './logger'
+import { Logger } from '@jukebox/logger'
 import { ServerConfig } from './server-config'
 import { WorldGenerator } from './world-generator'
 

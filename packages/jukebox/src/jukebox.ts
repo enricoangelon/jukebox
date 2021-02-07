@@ -1,12 +1,14 @@
 import { Config } from './config'
-import { Socket } from '@jukebox/raknet'
+import { Logger } from '@jukebox/logger'
+import { Server } from '@jukebox/raknet'
 import { resolve } from 'path'
 
 export class Jukebox {
   private static instance: Jukebox
+  private server: Server
   private config: Required<Config>
 
-  constructor(config: Required<Config>) {
+  public constructor(config: Required<Config>) {
     this.config = config
     if (Jukebox.instance) {
       this.config.logger.fatal(
@@ -18,26 +20,47 @@ export class Jukebox {
     this.start()
   }
 
-  public start() {
-    new Socket(this.config.server.port ?? 19132)
+  public start(): void {
+    Jukebox.getLogger().info(
+      'Starting Jukebox server for Minecraft bedrock edition...'
+    )
+
+    try {
+      this.server = new Server(
+        this.config.server.port ?? 19132,
+        this.config.server.maxPlayers ?? 20,
+        Jukebox.getLogger()
+      )
+    } catch (err) {
+      this.config.logger.fatal(err)
+    }
 
     // TODO: Implement bootstrapping
   }
 
-  public shutdown() {
+  public shutdown(): void {
+    this.server.close()
+    // this.server.close(() => {
+    //  Jukebox.getLogger().info('Successfully closed the server socket!')
+    // })
+
     // TODO: implement shutdown
   }
 
-  public static getConfig(): Config {
+  public static getServer(): Server {
+    return Jukebox.instance.server
+  }
+
+  public static getConfig(): Required<Config> {
     return Jukebox.instance.config
   }
 
-  public static getLogger() {
+  public static getLogger(): Logger {
     return Jukebox.instance.config.logger
   }
 }
 
-;(async function () {
+;(async () => {
   // node <file> <config>
   if (process.argv.length < 3) {
     console.error('Usage: node jukebox.js <config>')

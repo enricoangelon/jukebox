@@ -1,3 +1,3 @@
-export { Socket } from './socket'
+export { Server } from './server'
 export { Utils } from './utils'
 export { Identifiers } from './identifiers'

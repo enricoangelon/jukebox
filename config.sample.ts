@@ -1,4 +1,4 @@
-import { DevLogger } from '@jukebox/dev-logger'
+import { DevLogger } from '@jukebox/logger'
 import { FlatWorld } from '@jukebox/flat-world'
 
 export default {
@@ -16,5 +16,6 @@ export default {
   server: {
     port: 19132,
     motd: 'A jukebox minecraft bedrock server',
+    maxPlayers: 20,
   },
 }
