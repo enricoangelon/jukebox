@@ -9,6 +9,7 @@
     "strict": true,
     "composite": true,
     "types": ["node"],
-    "strictPropertyInitialization": false
+    "strictPropertyInitialization": false,
+    "allowSyntheticDefaultImports": true
   }
 }

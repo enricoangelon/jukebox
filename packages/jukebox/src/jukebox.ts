@@ -1,17 +1,17 @@
 import { Config } from './config'
 import { Logger } from '@jukebox/logger'
-import { Server } from '@jukebox/raknet'
+import { RakServer } from '@jukebox/raknet'
 import { resolve } from 'path'
 
 export class Jukebox {
   private static instance: Jukebox
-  private server: Server
+  private server: RakServer
   private config: Required<Config>
 
   public constructor(config: Required<Config>) {
     this.config = config
     if (Jukebox.instance) {
-      this.config.logger.fatal(
+      Jukebox.getLogger().fatal(
         'Attempted to start the server twice on a single node process.'
       )
     }
@@ -25,14 +25,16 @@ export class Jukebox {
       'Starting Jukebox server for Minecraft bedrock edition...'
     )
 
+    this.server = new RakServer(
+      Jukebox.getConfig().server.port ?? 19132,
+      Jukebox.getConfig().server.maxPlayers ?? 20,
+      Jukebox.getLogger()
+    )
+
     try {
-      this.server = new Server(
-        this.config.server.port ?? 19132,
-        this.config.server.maxPlayers ?? 20,
-        Jukebox.getLogger()
-      )
+      this.server.start()
     } catch (err) {
-      this.config.logger.fatal(err)
+      Jukebox.getLogger().fatal(err)
     }
 
     // TODO: Implement bootstrapping
@@ -47,7 +49,7 @@ export class Jukebox {
     // TODO: implement shutdown
   }
 
-  public static getServer(): Server {
+  public static getServer(): RakServer {
     return Jukebox.instance.server
   }
 

@@ -1,31 +1,48 @@
 import { BinaryStream } from '@jukebox/binarystream'
-import { RemoteInfo } from 'dgram'
+import { assert } from 'console'
 
-export class Packet extends BinaryStream {
-  // TODO: move to jukebox packet
-  public readString(): string {
-    const length = this.readUnsignedVarInt()
-    const data = this.read(length)
-    return data.toString('utf-8')
+export abstract class Packet {
+  private readonly id: number
+  private encoded = false
+
+  public constructor(id: number) {
+    this.id = id
   }
 
-  public writeString(v: string): void {
-    const data = Buffer.from(v, 'ascii')
-    this.writeUnsignedVarInt(data.length)
-    this.write(data)
+  protected encodeHeader(stream: BinaryStream): void {
+    assert(
+      this.encoded == false,
+      'Cannot encode multiple times the same packet'
+    )
+    stream.writeByte(this.getId())
   }
 
-  public readAddress(): RemoteInfo {
-    const version = this.readByte()
-    if (version == 4) {
-      const complement = ~this.readUInt()
-      const hostname = `${(complement >> 24) & 0xff}.${
-        (complement >> 16) & 0xff
-      }.${(complement >> 8) & 0xff}.${complement & 0xff}`
-      const port = this.readUShort()
-      return { address: hostname, port: port, family: 'IPv4' } as RemoteInfo
-    } else {
-      throw new Error('IPv6 not implemented yet!')
-    }
+  abstract encode(stream: BinaryStream): void
+
+  public internalEncode(stream = new BinaryStream()): Buffer {
+    this.encodeHeader(stream)
+    this.encode(stream)
+    this.encoded = true
+    return stream.getBuffer()
+  }
+
+  protected decodeHeader(stream: BinaryStream): void {
+    const id = stream.readByte()
+    assert(id == this.getId(), { id: id, error: 'Packet identifier mismatch' })
+  }
+
+  abstract decode(stream: BinaryStream): void
+
+  public internalDecode(stream: BinaryStream): void {
+    this.decodeHeader(stream)
+    this.decode(stream)
+  }
+
+  public getId(): number {
+    return this.id
+  }
+
+  public isEncoded(): boolean {
+    return this.encoded
   }
 }

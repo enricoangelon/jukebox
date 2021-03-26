@@ -2,3 +2,4 @@ node_modules
 packages/*/lib
 .tsbuildinfo
 config.sample.js
+docs

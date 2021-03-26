@@ -1,7 +1,8 @@
 import { DevLogger } from '@jukebox/logger'
 import { FlatWorld } from '@jukebox/flat-world'
+import { Config } from '@jukebox/core'
 
-export default {
+export default <Config>{
   worlds: [
     /* index 0 in the array will be the default world */
     new FlatWorld(/*{

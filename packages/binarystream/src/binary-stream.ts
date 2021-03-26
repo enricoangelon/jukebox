@@ -1,3 +1,5 @@
+import { assert } from 'console'
+
 export class BinaryStream {
   private buffer: Buffer
   private offset: number
@@ -8,6 +10,7 @@ export class BinaryStream {
   }
 
   public skip(len: number): void {
+    assert(Number.isInteger(len), 'Cannot skip a float amount of bytes')
     this.offset += len
   }
 
@@ -28,6 +31,7 @@ export class BinaryStream {
   }
 
   public read(len: number): Buffer {
+    assert(Number.isInteger(len), 'Cannot read a float amount of bytes')
     return this.buffer.slice(this.offset, (this.offset += len))
   }
 
@@ -41,7 +45,9 @@ export class BinaryStream {
   }
 
   public writeInt(v: number): void {
-    this.buffer.writeInt32BE(v, (this.offset += 4) - 4)
+    const buf = Buffer.alloc(4)
+    buf.writeInt32BE(v, 0)
+    this.write(buf)
   }
 
   public readTriad(): number {
@@ -49,7 +55,19 @@ export class BinaryStream {
   }
 
   public writeTriad(v: number): void {
-    this.buffer.writeIntBE(v, (this.offset += 3) - 3, 3)
+    const buf = Buffer.alloc(3)
+    buf.writeIntBE(v, 0, 3)
+    this.write(buf)
+  }
+
+  public readTriadLE(): number {
+    return this.buffer.readIntLE((this.offset += 3) - 3, 3)
+  }
+
+  public writeTriadLE(v: number): void {
+    const buf = Buffer.alloc(3)
+    buf.writeIntLE(v, 0, 3)
+    this.write(buf)
   }
 
   public readShort(): number {
@@ -62,11 +80,11 @@ export class BinaryStream {
     this.write(buf)
   }
 
-  public readUShort(): number {
+  public readUnsignedShort(): number {
     return this.buffer.readUInt16BE((this.offset += 2) - 2)
   }
 
-  public writeUShort(v: number): void {
+  public writeUnsignedShort(v: number): void {
     const buf = Buffer.alloc(2)
     buf.writeUInt16BE(v, 0)
     this.write(buf)
@@ -97,8 +115,14 @@ export class BinaryStream {
     this.write(buf)
   }
 
-  public readUInt(): number {
+  public readUnsignedInt(): number {
     return this.buffer.readUInt32BE((this.offset += 4) - 4)
+  }
+
+  public writeUnsignedInt(v: number): void {
+    const buf = Buffer.alloc(4)
+    buf.writeUInt32BE(v, 0)
+    this.write(buf)
   }
 
   private encodeZigZag32(v: number): number {
@@ -158,5 +182,10 @@ export class BinaryStream {
 
   public getBuffer(): Buffer {
     return this.buffer
+  }
+
+  public feof(): boolean {
+    assert(Number.isInteger(this.offset), 'The buffer offset is not an integer')
+    return this.getBuffer().byteLength == this.offset
   }
 }
