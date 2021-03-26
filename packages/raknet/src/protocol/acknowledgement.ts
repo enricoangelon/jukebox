@@ -1,13 +1,14 @@
 import { RangedRecord, Record, SingleRecord } from '../record'
 
 import { BinaryStream } from '@jukebox/binarystream'
+import { Identifiers } from '../identifiers'
 import { Packet } from '../packet'
 
 export class Acknowledgement extends Packet {
   public records: Set<Record> = new Set()
 
   public constructor() {
-    super(0xc0)
+    super(Identifiers.ACKNOWLEDGEMENT)
   }
 
   public encode(stream: BinaryStream): void {

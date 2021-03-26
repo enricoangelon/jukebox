@@ -277,18 +277,6 @@
   dependencies:
     defer-to-connect "^1.0.1"
 
-"@thi.ng/bitstream@^1.1.38":
-  version "1.1.38"
-  resolved "https://registry.yarnpkg.com/@thi.ng/bitstream/-/bitstream-1.1.38.tgz#717ff9679c30f3928b8acd13d0e214a423344db7"
-  integrity sha512-O0FtQzxUykBG2QbvHhDkWKrE0I0vMV43yNAqMtw0EUvaDpfbUimB0eFDiXqMV0x7KNo5XbyvAs3fbKJFKiEWaQ==
-  dependencies:
-    "@thi.ng/errors" "^1.3.0"
-
-"@thi.ng/errors@^1.3.0":
-  version "1.3.0"
-  resolved "https://registry.yarnpkg.com/@thi.ng/errors/-/errors-1.3.0.tgz#a9d460a194d8a719403df140c2976f4f4dce4432"
-  integrity sha512-/0U6Weot0cTTRmuiaTbD+OK7bhU30S1g/yQ7ca882hIT9tj1p7ptCgivV8YtIKO4LvWjdNgtHrr5aPGObOMtsw==
-
 "@types/events@*":
   version "3.0.0"
   resolved "https://registry.yarnpkg.com/@types/events/-/events-3.0.0.tgz#2862f3f58a9a7f7c3e78d79f130dd4d71c25c2a7"

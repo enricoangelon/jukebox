@@ -21,5 +21,8 @@ export enum Identifiers {
 
   UNCONNECTED_PONG = 0x1c,
 
+  ACKNOWLEDGEMENT = 0xc0,
+  NACKNOWLEDGEMENT = 0xa0,
+
   GAME_PACKET = 0xfe,
 }
