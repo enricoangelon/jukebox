@@ -176,6 +176,11 @@ export class BinaryStream {
     this.writeUnsignedVarInt(val)
   }
 
+  public setOffset(v: number): void {
+    assert(v >= 0, 'BinaryStream offset cannot be negative')
+    this.offset = v
+  }
+
   public getOffset(): number {
     return this.offset
   }

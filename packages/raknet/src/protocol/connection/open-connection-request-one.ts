@@ -16,13 +16,13 @@ export class OpenConnectionRequestOne extends Packet {
   public encode(stream: BinaryStream): void {
     NetUtils.writeMagic(stream)
     stream.writeByte(this.remoteProtocol)
-    const length = this.maximumTransferUnit - stream.getBuffer().length + 28
+    const length = this.maximumTransferUnit - stream.getBuffer().byteLength + 28
     stream.write(Buffer.alloc(length).fill(0x00))
   }
 
   public decode(stream: BinaryStream): void {
-    this.maximumTransferUnit = stream.getBuffer().length + 1 + 28
     this.magic = NetUtils.readMagic(stream)
     this.remoteProtocol = stream.readByte()
+    this.maximumTransferUnit = stream.getRemaining().byteLength + 46
   }
 }

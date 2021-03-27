@@ -2,6 +2,7 @@ import { BinaryStream } from '@jukebox/binarystream'
 import { Frame } from './frame'
 import { FrameFlags } from './frame-flags'
 import { Packet } from '../packet'
+import { assert } from 'console'
 
 // Represents the DatagramPacket
 export class FrameSetPacket extends Packet {
@@ -21,9 +22,11 @@ export class FrameSetPacket extends Packet {
   }
 
   protected decodeHeader(stream: BinaryStream): void {
-    stream.readByte()
-    // 0x80...0x8d
-    // TODO: assert(id == this.getId(), { id: id, error: 'FrameSet identifier mismatch' })
+    const id = stream.readByte()
+    assert(id >= 0x80 && id <= 0x8f, {
+      id: id,
+      error: 'FrameSet identifier mismatch',
+    })
   }
 
   public decode(stream: BinaryStream): void {

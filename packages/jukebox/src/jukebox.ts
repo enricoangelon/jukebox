@@ -1,6 +1,10 @@
+import { NetEvents, RakServer } from '@jukebox/raknet'
+
+import { BinaryStream } from '@jukebox/binarystream'
 import { Config } from './config'
 import { Logger } from '@jukebox/logger'
-import { RakServer } from '@jukebox/raknet'
+import { RemoteInfo } from 'dgram'
+import { WrapperPacket } from './network/wrapper-packet'
 import { resolve } from 'path'
 
 export class Jukebox {
@@ -33,6 +37,15 @@ export class Jukebox {
 
     try {
       this.server.start()
+      // Move handler somewhere else
+      this.server.addListener(
+        NetEvents.GAME_PACKET,
+        (stream: BinaryStream, rinfo: RemoteInfo) => {
+          const wrapper = new WrapperPacket()
+          wrapper.internalDecode(stream)
+          console.log(wrapper.getPackets())
+        }
+      )
     } catch (err) {
       Jukebox.getLogger().fatal(err)
     }
@@ -42,9 +55,7 @@ export class Jukebox {
 
   public shutdown(): void {
     this.server.close()
-    // this.server.close(() => {
-    //  Jukebox.getLogger().info('Successfully closed the server socket!')
-    // })
+    Jukebox.getLogger().info('Successfully closed the server socket!')
 
     // TODO: implement shutdown
   }

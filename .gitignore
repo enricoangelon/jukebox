@@ -3,3 +3,4 @@ packages/*/lib
 .tsbuildinfo
 config.sample.js
 docs
+.vscode/settings.json

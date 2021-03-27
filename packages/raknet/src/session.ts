@@ -21,6 +21,7 @@ import { OpenConnectionRequestTwo } from './protocol/connection/open-connection-
 import { Packet } from './packet'
 import { RakServer } from './server'
 import { RemoteInfo } from 'dgram'
+import { assert } from 'console'
 
 export class NetworkSession {
   private readonly socket: RakServer
@@ -51,6 +52,9 @@ export class NetworkSession {
   private orderingIndexes: Map<number, number> = new Map()
   // Used to identify split packets
   private fragmentID = 0
+
+  // fragmentID -> FragmentedFrame ( index -> buffer )
+  private fragmentedFrames: Map<number, Map<number, Frame>> = new Map()
 
   public constructor(socket: RakServer, rinfo: RemoteInfo, logger: Logger) {
     this.guid = null
@@ -140,7 +144,7 @@ export class NetworkSession {
     // Used to timout the client if we don't receive new packets
     this.receiveTimestamp = Date.now()
 
-    const packetId = stream.getBuffer()[0]
+    const packetId = stream.getBuffer().readUInt8(0)
     if (packetId == Identifiers.OPEN_CONNECTION_REQUEST_1) {
       await this.handleOpenConnectionRequestOne(stream)
       return true
@@ -196,6 +200,13 @@ export class NetworkSession {
   }
 
   private handleFrame(frame: Frame): void {
+    if (frame.isFragmented()) {
+      this.logger.debug(
+        `Recived a fragmented Frame fragmentSize=${frame.fragmentSize}, fragmentID=${frame.fragmentID}, fragmentIndex=${frame.fragmentIndex}`
+      )
+      return this.handleFragmentedFrame(frame)
+    }
+
     const packetId = frame.content.readUInt8(0)
     const stream = new BinaryStream(frame.content)
 
@@ -213,6 +224,9 @@ export class NetworkSession {
         const connectionRequest = new ConnectionRequest()
         connectionRequest.internalDecode(stream)
 
+        // TODO: GUID implementation
+        this.guid = connectionRequest.clientGUID
+
         const connectionRequestAccepted = new ConnectionRequestAccepted()
         connectionRequestAccepted.clientAddress = this.rinfo
         connectionRequestAccepted.clientTimestamp = connectionRequest.timestamp
@@ -228,10 +242,50 @@ export class NetworkSession {
         this.socket.removeSession(this)
         break
       case Identifiers.GAME_PACKET:
-        this.socket.emit('batch', stream)
+        this.socket.emit('game_packet', stream, this.rinfo)
         break
       default:
         this.logger.debug(`Unhandled packet with ID=${packetId.toString(16)}`)
+    }
+  }
+
+  private handleFragmentedFrame(frame: Frame) {
+    assert(frame.isFragmented(), 'Cannot reasseble a non fragmented packet')
+    const fragmentID = frame.fragmentID
+    const fragmentIndex = frame.fragmentIndex
+    if (!this.fragmentedFrames.has(fragmentID)) {
+      const fragments = new Map()
+      fragments.set(fragmentIndex, frame)
+      this.fragmentedFrames.set(fragmentID, fragments)
+    } else {
+      const fragments = this.fragmentedFrames.get(fragmentID)!
+      fragments.set(fragmentIndex, frame)
+      this.fragmentedFrames.set(fragmentID, fragments)
+
+      if (frame.fragmentSize == fragments.size) {
+        const finalContent = new BinaryStream()
+        const fragments = this.fragmentedFrames.get(fragmentID)!
+        // Ensure the correctness of the buffer orders
+        for (let i = 0; i < fragments.size; i++) {
+          const splitContent = fragments.get(i)!
+          finalContent.write(splitContent.content)
+        }
+
+        // TODO: not sure if i should set reliability
+        // of the first splitted packet, need to confirm
+        const firstFrame = fragments.get(0)!
+        const reliability = firstFrame.reliability
+        const finalFrame = new Frame()
+        finalFrame.content = finalContent.getBuffer()
+        finalFrame.reliability = reliability
+        if (firstFrame.isOrdered()) {
+          finalFrame.orderedIndex = firstFrame.orderedIndex
+          firstFrame.orderChannel = firstFrame.orderChannel
+        }
+
+        this.fragmentedFrames.delete(fragmentID)
+        this.handleFrame(finalFrame)
+      }
     }
   }
 

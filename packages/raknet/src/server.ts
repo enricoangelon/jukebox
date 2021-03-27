@@ -9,6 +9,7 @@ import { Packet } from './packet'
 import { UnconnectedPing } from './protocol/offline/unconnected-ping'
 import { UnconnectedPong } from './protocol/offline/unconnected-pong'
 import { assert } from 'console'
+import { inspect } from 'util'
 import { randomBytes } from 'crypto'
 
 export class RakServer extends EventEmitter {
@@ -114,7 +115,7 @@ export class RakServer extends EventEmitter {
   ): NetworkSession | null {
     const token = `${rinfo.address}:${rinfo.port}`
     if (!this.connections.has(token)) {
-      const packetId = stream.getBuffer()[0]
+      const packetId = stream.getBuffer().readUInt8(0)
       if (packetId == Identifiers.OPEN_CONNECTION_REQUEST_1) {
         this.logger.debug(`Creating a RakNet session for ${token}`)
 

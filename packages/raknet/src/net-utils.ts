@@ -42,8 +42,9 @@ export class NetUtils {
     })
     stream.writeByte(rinfo.family === 'IPv4' ? Info.IPV4 : Info.IPV6)
     if (rinfo.family === 'IPv4') {
-      for (let i = 0; i < rinfo.address.length; i++) {
-        stream.writeByte(~rinfo.address[i] & 0xff)
+      const splittedAddress = rinfo.address.split('.', 4)
+      for (const split of splittedAddress) {
+        stream.writeByte(-split - 1)
       }
       stream.writeUnsignedShort(rinfo.port)
     } else if (rinfo.family === 'IPv6') {
