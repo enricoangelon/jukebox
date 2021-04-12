@@ -1,16 +1,20 @@
-import { NetEvents, RakServer } from '@jukebox/raknet'
+import { NetEvents, NetworkSession, RakServer } from '@jukebox/raknet'
 
 import { BinaryStream } from '@jukebox/binarystream'
 import { Config } from './config'
+import { Encryption } from './encryption'
 import { Logger } from '@jukebox/logger'
+import { PacketRegistry } from './network/packet-registry'
+import { PlayerConnection } from './network/player-connection'
 import { RemoteInfo } from 'dgram'
-import { WrapperPacket } from './network/wrapper-packet'
 import { resolve } from 'path'
 
 export class Jukebox {
   private static instance: Jukebox
   private server: RakServer
   private config: Required<Config>
+  private connections: Map<RemoteInfo, PlayerConnection> = new Map()
+  private encryption: Encryption | null = null
 
   public constructor(config: Required<Config>) {
     this.config = config
@@ -35,22 +39,53 @@ export class Jukebox {
       Jukebox.getLogger()
     )
 
+    // Init packet registry
+    PacketRegistry.init()
+
+    // Init encryption
+    if (Jukebox.getConfig().encryption != false) {
+      this.encryption = new Encryption()
+      Jukebox.getLogger().info(
+        `Encryption is enabled, preparing server keys...`
+      )
+    }
+
+    // Start the actual server
+    this.server.addListener(NetEvents.GAME_PACKET, this.handleRawNetwork)
+
     try {
       this.server.start()
-      // Move handler somewhere else
-      this.server.addListener(
-        NetEvents.GAME_PACKET,
-        (stream: BinaryStream, rinfo: RemoteInfo) => {
-          const wrapper = new WrapperPacket()
-          wrapper.internalDecode(stream)
-          console.log(wrapper.getPackets())
-        }
-      )
     } catch (err) {
       Jukebox.getLogger().fatal(err)
     }
 
-    // TODO: Implement bootstrapping
+    // Tick connections every 1/20 seconds
+    setInterval(() => {
+      for (const conn of this.connections.values()) {
+        // Timestamp in nanoseconds for debug purposes
+        conn.process(process.hrtime()[1])
+      }
+    }, 50)
+  }
+
+  /**
+   * Handles the raw packet buffer
+   * received from the RakNet session.
+   *
+   * @param stream
+   * @param session
+   */
+  private handleRawNetwork(
+    stream: BinaryStream,
+    session: NetworkSession
+  ): void {
+    const rinfo = session.getRemoteInfo()
+    if (!Jukebox.instance.connections.has(rinfo)) {
+      Jukebox.instance.connections.set(rinfo, new PlayerConnection(session))
+    }
+
+    const conn = Jukebox.instance.connections.get(rinfo)!
+    conn.handleWrapper(stream)
   }
 
   public shutdown(): void {
@@ -70,6 +105,10 @@ export class Jukebox {
 
   public static getLogger(): Logger {
     return Jukebox.instance.config.logger
+  }
+
+  public static getEncryption(): Encryption | null {
+    return Jukebox.instance.encryption
   }
 }
 

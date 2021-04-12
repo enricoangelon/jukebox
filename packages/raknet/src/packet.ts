@@ -1,5 +1,6 @@
+import * as assert from 'assert'
+
 import { BinaryStream } from '@jukebox/binarystream'
-import { assert } from 'console'
 
 export abstract class Packet {
   private readonly id: number
@@ -28,7 +29,7 @@ export abstract class Packet {
 
   protected decodeHeader(stream: BinaryStream): void {
     const id = stream.readByte()
-    assert(id == this.getId(), { id: id, error: 'Packet identifier mismatch' })
+    assert(id == this.getId(), 'Packet identifier mismatch')
   }
 
   abstract decode(stream: BinaryStream): void

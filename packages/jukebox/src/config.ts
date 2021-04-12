@@ -7,4 +7,5 @@ export interface Config {
   server?: ServerConfig
   worlds?: WorldGenerator[]
   lang?: string
+  encryption?: boolean
 }

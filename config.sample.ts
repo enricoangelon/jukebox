@@ -14,6 +14,7 @@ export default <Config>{
   lang: 'en_US',
   filesystem: null, // Can optionally be in memory
   plugins: [],
+  encryption: true,
   server: {
     port: 19132,
     motd: 'A jukebox minecraft bedrock server',

@@ -9,14 +9,13 @@ import { Packet } from './packet'
 import { UnconnectedPing } from './protocol/offline/unconnected-ping'
 import { UnconnectedPong } from './protocol/offline/unconnected-pong'
 import { assert } from 'console'
-import { inspect } from 'util'
 import { randomBytes } from 'crypto'
 
 export class RakServer extends EventEmitter {
   private static socket: Socket
   private readonly maxConnections: number
-  private readonly guidConnections: Map<bigint, NetworkSession>
-  private readonly connections: Map<string, NetworkSession>
+  private readonly guidConnections: Map<bigint, NetworkSession> = new Map()
+  private readonly sessions: Map<string, NetworkSession> = new Map()
   private readonly guid: bigint
   private readonly logger: Logger
   private readonly port: number
@@ -25,8 +24,6 @@ export class RakServer extends EventEmitter {
   public constructor(port: number, maxConnections: number, logger?: Logger) {
     super()
     this.port = port
-    this.connections = new Map()
-    this.guidConnections = new Map()
     this.maxConnections = maxConnections
     this.logger = logger ?? new DevLogger()
 
@@ -64,8 +61,8 @@ export class RakServer extends EventEmitter {
         clearInterval(tick)
       }
 
-      for (const connection of this.connections.values()) {
-        connection.tick(Date.now())
+      for (const session of this.sessions.values()) {
+        session.tick(Date.now())
       }
     }, 50)
   }
@@ -114,27 +111,27 @@ export class RakServer extends EventEmitter {
     rinfo: RemoteInfo
   ): NetworkSession | null {
     const token = `${rinfo.address}:${rinfo.port}`
-    if (!this.connections.has(token)) {
+    if (!this.sessions.has(token)) {
       const packetId = stream.getBuffer().readUInt8(0)
       if (packetId == Identifiers.OPEN_CONNECTION_REQUEST_1) {
         this.logger.debug(`Creating a RakNet session for ${token}`)
 
         const connection = new NetworkSession(this, rinfo, this.logger)
-        this.connections.set(token, connection)
+        this.sessions.set(token, connection)
       }
     }
 
-    return this.connections.get(token) ?? null
+    return this.sessions.get(token) ?? null
   }
 
   public removeSession(session: NetworkSession): void {
     const rinfo = session.getRemoteInfo()
     const token = `${rinfo.address}:${rinfo.port}`
-    if (this.connections.has(token)) {
-      this.connections.delete(token)
-      this.logger.debug(`Closed session for [${token}]`)
+    if (this.sessions.has(token)) {
+      this.sessions.delete(token)
+      this.logger.debug(`Closed session for ${token}`)
     } else {
-      this.logger.error(`Cannot remove an unexisting session [${token}]`)
+      this.logger.error(`Cannot remove an unexisting session ${token}`)
     }
   }
 

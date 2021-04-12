@@ -13,7 +13,9 @@ import { FrameSetPacket } from './protocol/frame-set-packet'
 import { Identifiers } from './identifiers'
 import { Info } from './info'
 import { Logger } from '@jukebox/logger'
+import { NetEvents } from './net-events'
 import { NewIncomingConnection } from './protocol/connection/new-incoming-connection'
+import { NotAcknowledgement } from './protocol/not-acknowledgement'
 import { OpenConnectionReplyOne } from './protocol/connection/open-connection-reply-one'
 import { OpenConnectionReplyTwo } from './protocol/connection/open-connection-reply-two'
 import { OpenConnectionRequestOne } from './protocol/connection/open-connection-request-one'
@@ -74,7 +76,11 @@ export class NetworkSession {
 
       // Just a friendly logger... what's wrong with it... it's honest after all
       const sequences = Array.from(this.inputSequenceNumbers)
-      this.logger.debug(`Sent multiple single ACKs: ${sequences.join(', ')}`)
+      this.logger.debug(
+        `Sent multiple single ACKs [${sequences.join(', ')}] to ${
+          this.rinfo.address
+        }:${this.rinfo.port}`
+      )
 
       /* 
       TODO: implement ranges
@@ -100,7 +106,7 @@ export class NetworkSession {
       this.inputSequenceNumbers.clear()
     }
 
-    // Not Acknowledge nonm received packets
+    // Not Acknowledge non received packets
     if (this.nackSequenceNumbers.size > 0) {
       this.logger.debug('Received a NACK')
       if (this.nackSequenceNumbers.size == 1) {
@@ -166,7 +172,7 @@ export class NetworkSession {
     // Ignore the packet if we already received it
     if (this.inputSequenceNumbers.has(frameSetPacket.sequenceNumber)) {
       this.logger.debug(
-        `Discarded already received FrameSet with sequenceNumber=${frameSetPacket.sequenceNumber}`
+        `Discarded already received FrameSet with sequenceNumber=${frameSetPacket.sequenceNumber} from ${this.rinfo.address}:${this.rinfo.port}`
       )
       return
     }
@@ -202,7 +208,7 @@ export class NetworkSession {
   private handleFrame(frame: Frame): void {
     if (frame.isFragmented()) {
       this.logger.debug(
-        `Recived a fragmented Frame fragmentSize=${frame.fragmentSize}, fragmentID=${frame.fragmentID}, fragmentIndex=${frame.fragmentIndex}`
+        `Recived a fragmented Frame fragmentSize=${frame.fragmentSize}, fragmentID=${frame.fragmentID}, fragmentIndex=${frame.fragmentIndex} from ${this.rinfo.address}:${this.rinfo.port}`
       )
       return this.handleFragmentedFrame(frame)
     }
@@ -236,16 +242,19 @@ export class NetworkSession {
       case Identifiers.NEW_INCOMING_CONNECTION:
         const newIncomingConnection = new NewIncomingConnection()
         newIncomingConnection.internalDecode(stream)
-        // TODO: aynthing to do here?
         break
       case Identifiers.DISCONNECT_NOTIFICATION:
         this.socket.removeSession(this)
         break
       case Identifiers.GAME_PACKET:
-        this.socket.emit('game_packet', stream, this.rinfo)
+        this.socket.emit(NetEvents.GAME_PACKET, stream, this)
         break
       default:
-        this.logger.debug(`Unhandled packet with ID=${packetId.toString(16)}`)
+        this.logger.debug(
+          `Unhandled packet with ID=${packetId.toString(16)} from ${
+            this.rinfo.address
+          }:${this.rinfo.port}`
+        )
     }
   }
 
@@ -289,6 +298,20 @@ export class NetworkSession {
     }
   }
 
+  public sendInstantBuffer(
+    buffer: Buffer,
+    reliability = FrameReliability.UNRELIABLE
+  ): void {
+    const frame = new Frame()
+    frame.reliability = reliability
+    frame.content = buffer
+    frame.orderChannel = 0
+    const frameSet = new FrameSetPacket()
+    frameSet.sequenceNumber = this.outputSequenceNumber++
+    frameSet.frames.push(frame)
+    this.sendPacket(frameSet)
+  }
+
   public sendInstantPacket<T extends Packet>(
     packet: T,
     reliability = FrameReliability.UNRELIABLE
@@ -296,6 +319,7 @@ export class NetworkSession {
     const frame = new Frame()
     frame.reliability = reliability
     frame.content = packet.internalEncode()
+    frame.orderChannel = 0
     const frameSet = new FrameSetPacket()
     frameSet.sequenceNumber = this.outputSequenceNumber++
     frameSet.frames.push(frame)
@@ -366,7 +390,21 @@ export class NetworkSession {
     }
   }
 
-  private sendLostFrameSet(sequenceNumber: number): void {}
+  private sendLostFrameSet(sequenceNumber: number): void {
+    if (this.outputFrameSets.has(sequenceNumber)) {
+      const packet = this.outputFrameSets.get(sequenceNumber)!
+      this.outputFrameSets.delete(sequenceNumber)
+      // Skip queues when resending a lost packet
+      this.sendInstantPacket(packet)
+      this.logger.debug(
+        `Sent lost packet with sequenceNumber=${sequenceNumber} to ${this.rinfo.address}:${this.rinfo.port}`
+      )
+    } else {
+      this.logger.debug(
+        `Cannot find lost frame set with sequenceNumber=${sequenceNumber}`
+      )
+    }
+  }
 
   private handleAcknowledgement(stream: BinaryStream): void {
     const ack = new Acknowledgement()
@@ -400,8 +438,20 @@ export class NetworkSession {
   }
 
   private handleNacknowledgement(stream: BinaryStream): void {
-    // this.sendLostFrameSet()
-    this.logger.debug('GOT NACK')
+    const nack = new NotAcknowledgement()
+    nack.internalDecode(stream)
+
+    nack.records.forEach(record => {
+      if (record.isSingle()) {
+        this.sendLostFrameSet((record as SingleRecord).getSeqNumber())
+      } else {
+        const startSeqNum = (record as RangedRecord).getStartSeqNumber()
+        const endSeqNum = (record as RangedRecord).getStartSeqNumber()
+        for (let i = startSeqNum; i < endSeqNum; i++) {
+          this.sendLostFrameSet(i)
+        }
+      }
+    })
   }
 
   private async handleOpenConnectionRequestOne(
@@ -442,6 +492,9 @@ export class NetworkSession {
     openConnectionReplyTwo.serverGuid = this.socket.getGuid()
 
     this.mtu = openConnectionRequestTwo.maximumTransferUnit
+    this.logger.debug(
+      `Maximum Transfer Unit agreed to be: ${this.mtu} with ${this.rinfo.address}:${this.rinfo.port}`
+    )
 
     // TODO: guid
     // if (this.socket.hasClientGuid(this.getGuid())) {

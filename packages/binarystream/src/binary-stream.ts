@@ -44,6 +44,10 @@ export class BinaryStream {
     return this.buffer.readInt32BE((this.offset += 4) - 4)
   }
 
+  public readIntLE(): number {
+    return this.buffer.readInt32LE((this.offset += 4) - 4)
+  }
+
   public writeInt(v: number): void {
     const buf = Buffer.alloc(4)
     buf.writeInt32BE(v, 0)

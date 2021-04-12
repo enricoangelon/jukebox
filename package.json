@@ -14,7 +14,11 @@
     "run": "tsc config.sample.ts && node -r source-map-support packages/jukebox/lib/index.js config.sample.js"
   },
   "devDependencies": {
-    "@types/node": "12.7.12",
+    "@types/asn1": "^0.2.0",
+    "@types/elliptic": "^6.4.12",
+    "@types/jsonwebtoken": "^8.5.1",
+    "@types/node": "^14.14.37",
+    "@types/promise-queue": "^2.2.0",
     "ava": "2.4.0",
     "husky": "3.0.9",
     "oao": "1.7.0",
@@ -22,13 +26,18 @@
     "pretty-quick": "2.0.0",
     "source-map-support": "0.5.16",
     "ts-node": "8.4.1",
-    "typedoc": "^0.20.33",
-    "typescript": "4.1.3"
+    "typescript": "4.2.3"
   },
   "husky": {
     "hooks": {
       "pre-commit": "pretty-quick --staged"
     }
   },
-  "dependencies": {}
+  "dependencies": {
+    "asn1": "^0.2.4",
+    "elliptic": "^6.5.4",
+    "jsonwebtoken": "^8.5.1",
+    "key-encoder": "^2.0.3",
+    "promise-queue": "^2.2.5"
+  }
 }

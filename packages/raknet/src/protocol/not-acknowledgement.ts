@@ -5,7 +5,7 @@ import { Identifiers } from '../identifiers'
 import { Packet } from '../packet'
 
 export class NotAcknowledgement extends Packet {
-  public records: Set<Record>
+  public records: Set<Record> = new Set()
 
   public constructor() {
     super(Identifiers.NACKNOWLEDGEMENT)
