@@ -14,6 +14,7 @@ import { EncryptionContext } from './minecraft/encryption/encryption-context'
 import { FrameReliability } from '@jukebox/raknet/lib/protocol/frame-reliability'
 import { Jukebox } from '../jukebox'
 import { McpeLogin } from './minecraft/login'
+import { McpeResourcePacksInfo } from './minecraft/resource-packs-info'
 import { McpeServerToClientHandshake } from './minecraft/server-to-client-handshake'
 import { NetworkSession } from '@jukebox/raknet'
 import { Player } from '../player'
@@ -46,13 +47,19 @@ export class PlayerConnection {
       for (const dataPacket of this.outputPacketsQueue) {
         wrapper.addPacket(dataPacket)
         packetNames.push(dataPacket.constructor.name)
+        this.outputPacketsQueue.delete(dataPacket)
       }
 
-      this.networkSession.sendQueuedPacket(
-        wrapper,
-        FrameReliability.RELIABLE_ORDERED
-      )
-      this.outputPacketsQueue.clear()
+      if (this.isEncryptionEnabled()) {
+        this.encryptWrapper(wrapper).then(encrypted => {
+          this.networkSession.sendQueuedBuffer(encrypted)
+        })
+      } else {
+        this.networkSession.sendQueuedPacket(
+          wrapper,
+          FrameReliability.RELIABLE_ORDERED
+        )
+      }
 
       // Make a user friendly log :)
       const packetNameList = packetNames.join(', ')
@@ -84,8 +91,12 @@ export class PlayerConnection {
         this.handleClientToServerHandshake(clientToServerHandshake)
         break
       default:
+        // TODO: improve this with regex (probably)
+        const hexId = id.toString(16)
         Jukebox.getLogger().debug(
-          `Handler for packet with id=0x${id.toString(16)} not implemented!`
+          `Handler for packet with id=0x${
+            hexId.length > 1 ? hexId : '0' + hexId
+          } not implemented!`
         )
     }
   }
@@ -181,7 +192,7 @@ export class PlayerConnection {
         'Missing client public key, cannot continue encryption'
       )
 
-      let clientRawPubKey = firstHeader!.header.x5u
+      let clientRawPubKey = firstHeader.header.x5u
       for (const token of certChainData) {
         const verified = verify(token, Encryption.rawToPem(clientRawPubKey), {
           algorithms: ['ES384'],
@@ -228,9 +239,18 @@ export class PlayerConnection {
       return
     }
 
+    this.continueLogin()
+  }
+
+  private continueLogin(): void {
     const playStatus = new McpePlayStatus()
     playStatus.status = PlayStatus.LOGIN_SUCCESS
     this.sendImmediateDataPacket(playStatus)
+
+    const resourcePacksInfo = new McpeResourcePacksInfo()
+    resourcePacksInfo.mustAccept = false
+    resourcePacksInfo.hasScripts = false
+    this.sendImmediateDataPacket(resourcePacksInfo)
   }
 
   private handleClientCacheStatus(packet: ClientCacheStatus): void {
@@ -246,33 +266,41 @@ export class PlayerConnection {
       `Successfully estabilished an encrypted connection with ${rinfo.address}:${rinfo.port}`
     )
 
-    const playStatus = new McpePlayStatus()
-    playStatus.status = PlayStatus.LOGIN_SUCCESS
-    this.sendImmediateDataPacket(playStatus)
+    this.continueLogin()
   }
 
   public sendQueuedDataPacket<T extends DataPacket>(packet: T): void {
     this.outputPacketsQueue.add(packet)
   }
 
-  private sendInstantEncryptedWrapper(wrapper: WrapperPacket): void {
+  private sendImmediateEncryptedWrapper(wrapper: WrapperPacket): void {
+    this.encryptWrapper(wrapper).then(encrypted => {
+      this.networkSession.sendInstantBuffer(
+        encrypted,
+        FrameReliability.RELIABLE_ORDERED
+      )
+    })
+  }
+
+  private async encryptWrapper(wrapper: WrapperPacket): Promise<Buffer> {
     assert(this.encryptionContext != null, 'Failed to initialize encryption!')
     // Encode the buffer and skip the header, theorically should
     // return wrapper header + zlib encoded packets content
-    // TODO: use the queue
     const zippedBuffer = wrapper.internalEncode().slice(1)
     const checksum = this.encryptionContext.computeEncryptChecksum(zippedBuffer)
     const fullBuffer = Buffer.concat([zippedBuffer, checksum])
-    this.encryptionContext.encrypt(fullBuffer).then(encrypted => {
-      // Add the wrapper header
-      const stream = new BinaryStream()
-      stream.writeByte(0xfe)
-      stream.write(encrypted)
+    return new Promise((resolve, reject) => {
+      this.encryptionQueue
+        .add(() => this.encryptionContext!.encrypt(fullBuffer))
+        .then(encrypted => {
+          // Add the wrapper header
+          const stream = new BinaryStream()
+          stream.writeByte(0xfe)
+          stream.write(encrypted)
 
-      this.networkSession.sendInstantBuffer(
-        stream.getBuffer(),
-        FrameReliability.RELIABLE_ORDERED
-      )
+          resolve(stream.getBuffer())
+        })
+        .catch(err => reject(err))
     })
   }
 
@@ -281,7 +309,7 @@ export class PlayerConnection {
     wrapper.addPacket(packet)
 
     if (this.isEncryptionEnabled()) {
-      this.sendInstantEncryptedWrapper(wrapper)
+      this.sendImmediateEncryptedWrapper(wrapper)
       return
     }
 

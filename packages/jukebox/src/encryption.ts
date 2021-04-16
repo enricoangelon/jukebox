@@ -1,11 +1,9 @@
 import { Ber, BerReader, BerWriter } from 'asn1'
-import { ECDH, createECDH, randomBytes } from 'crypto'
+import { ECDH, createECDH } from 'crypto'
 
 import { ec as EC } from 'elliptic'
 import KeyEncoder from 'key-encoder'
 
-// TODO: refactor, move this to main jukebox library
-// as this is not Minecraft fully related
 export class Encryption {
   public static readonly CURVE = 'secp384r1'
   private readonly serverKeyPair: ECDH

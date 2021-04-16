@@ -84,6 +84,12 @@ export class BinaryStream {
     this.write(buf)
   }
 
+  public writeUnsignedShortLE(v: number): void {
+    const buf = Buffer.alloc(2)
+    buf.writeUInt16LE(v, 0)
+    this.write(buf)
+  }
+
   public readUnsignedShort(): number {
     return this.buffer.readUInt16BE((this.offset += 2) - 2)
   }

@@ -57,27 +57,21 @@ export class EncryptionContext {
 
   public async decrypt(buffer: Buffer): Promise<Buffer> {
     return new Promise((resolve, reject) => {
-      this.decipher.write(buffer)
-      this.decipher
-        .once('data', chunk => {
-          resolve(chunk)
-        })
-        .once('error', err => {
-          reject(err)
-        })
+      try {
+        resolve(this.decipher.update(buffer))
+      } catch (err) {
+        reject(err)
+      }
     })
   }
 
   public async encrypt(buffer: Buffer): Promise<Buffer> {
     return new Promise((resolve, reject) => {
-      this.cipher.write(buffer)
-      this.cipher
-        .once('data', chunk => {
-          resolve(chunk)
-        })
-        .once('error', err => {
-          reject(err)
-        })
+      try {
+        resolve(this.cipher.update(buffer))
+      } catch (err) {
+        reject(err)
+      }
     })
   }
 }

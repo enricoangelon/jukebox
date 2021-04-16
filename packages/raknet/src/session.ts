@@ -108,7 +108,7 @@ export class NetworkSession {
 
     // Not Acknowledge non received packets
     if (this.nackSequenceNumbers.size > 0) {
-      this.logger.debug('Received a NACK')
+      this.logger.debug('We miss packets, send a NACK')
       if (this.nackSequenceNumbers.size == 1) {
         // Single sequence number
       } else {
@@ -120,12 +120,16 @@ export class NetworkSession {
     if (this.outputFramesQueue.size > 0) {
       const frameSet = new FrameSetPacket()
       frameSet.sequenceNumber = this.outputSequenceNumber++
-      frameSet.frames = Array.from(this.outputFramesQueue)
+      const frames = Array.from(this.outputFramesQueue)
+      frameSet.frames = frames
       this.logger.debug(
         `Sent FrameSet with sequenceNumber=${frameSet.sequenceNumber} holding ${frameSet.frames.length} frame(s)`
       )
-      this.sendPacket(frameSet)
-      this.outputFramesQueue.clear()
+      this.sendFrameSet(frameSet)
+      // Delete sent frames from output queue
+      for (const frame of frames) {
+        this.outputFramesQueue.delete(frame)
+      }
     }
   }
 
@@ -305,11 +309,7 @@ export class NetworkSession {
     const frame = new Frame()
     frame.reliability = reliability
     frame.content = buffer
-    frame.orderChannel = 0
-    const frameSet = new FrameSetPacket()
-    frameSet.sequenceNumber = this.outputSequenceNumber++
-    frameSet.frames.push(frame)
-    this.sendPacket(frameSet)
+    this.sendImmediateFrame(frame)
   }
 
   public sendInstantPacket<T extends Packet>(
@@ -319,11 +319,17 @@ export class NetworkSession {
     const frame = new Frame()
     frame.reliability = reliability
     frame.content = packet.internalEncode()
-    frame.orderChannel = 0
-    const frameSet = new FrameSetPacket()
-    frameSet.sequenceNumber = this.outputSequenceNumber++
-    frameSet.frames.push(frame)
-    this.sendPacket(frameSet)
+    this.sendImmediateFrame(frame)
+  }
+
+  public sendQueuedBuffer(
+    buffer: Buffer,
+    reliability = FrameReliability.UNRELIABLE
+  ): void {
+    const frame = new Frame()
+    frame.reliability = reliability
+    frame.content = buffer
+    this.sendQueuedFrame(frame)
   }
 
   public sendQueuedPacket<T extends Packet>(
@@ -336,7 +342,7 @@ export class NetworkSession {
     this.sendQueuedFrame(frame)
   }
 
-  private sendQueuedFrame(frame: Frame): void {
+  private getFilledFrame(frame: Frame): Frame {
     if (frame.isReliable()) {
       frame.reliableIndex = this.outputReliableIndex++
       if (frame.isOrdered()) {
@@ -350,43 +356,71 @@ export class NetworkSession {
         }
       }
     }
+    return frame
+  }
+
+  private fragmentFrame(frame: Frame): Frame[] {
+    const fragments: Array<Frame> = []
+    const buffers: Map<number, Buffer> = new Map()
+    let index = 0,
+      splitIndex = 0
+
+    while (index < frame.content.byteLength) {
+      // Push format: [chunk index: int, chunk: buffer]
+      buffers.set(splitIndex++, frame.content.slice(index, (index += this.mtu)))
+    }
+
+    for (const [index, buffer] of buffers) {
+      const newFrame = new Frame()
+      newFrame.fragmentID = this.fragmentID++
+      newFrame.fragmentSize = buffers.size
+      newFrame.fragmentIndex = index
+      newFrame.reliability = frame.reliability
+      newFrame.content = buffer
+
+      if (frame.isReliable()) {
+        newFrame.reliableIndex = this.outputReliableIndex++
+        if (newFrame.isOrdered()) {
+          newFrame.orderChannel = frame.orderChannel
+          newFrame.orderedIndex = frame.orderedIndex
+        }
+      }
+
+      fragments.push(newFrame)
+    }
+
+    return fragments
+  }
+
+  private sendQueuedFrame(frame: Frame): void {
+    const filledFrame = this.getFilledFrame(frame)
 
     // Split the frame in multiple frames if its bytelength
     // length exceeds the maximumx transfer unit limit
-    if (frame.getByteSize() > this.mtu) {
-      const buffers: Map<number, Buffer> = new Map()
-      let index = 0,
-        splitIndex = 0
-
-      while (index < frame.content.byteLength) {
-        // Push format: [chunk index: int, chunk: buffer]
-        buffers.set(
-          splitIndex++,
-          frame.content.slice(index, (index += this.mtu))
-        )
-      }
-
-      for (const [index, buffer] of buffers) {
-        const newFrame = new Frame()
-        newFrame.fragmentID = this.fragmentID++
-        newFrame.fragmentSize = buffers.size
-        newFrame.fragmentIndex = index
-        newFrame.reliability = frame.reliability
-        newFrame.content = buffer
-
-        if (frame.isReliable()) {
-          newFrame.reliableIndex = this.outputReliableIndex++
-          if (newFrame.isOrdered()) {
-            newFrame.orderChannel = frame.orderChannel
-            newFrame.orderedIndex = frame.orderedIndex
-          }
-        }
-
-        // TODO: need to recursive resend?
+    if (filledFrame.getByteSize() > this.mtu) {
+      this.fragmentFrame(filledFrame).forEach(frame => {
         this.outputFramesQueue.add(frame)
-      }
+      })
     } else {
       this.outputFramesQueue.add(frame)
+    }
+  }
+
+  private sendImmediateFrame(frame: Frame): void {
+    const filledFrame = this.getFilledFrame(frame)
+
+    if (filledFrame.getByteSize() > this.mtu) {
+      this.fragmentFrame(frame).forEach(frame => {
+        const frameSet = new FrameSetPacket()
+        frameSet.sequenceNumber = this.outputSequenceNumber++
+        frameSet.frames.push(frame)
+        this.sendFrameSet(frameSet)
+      })
+    } else {
+      const frameSet = new FrameSetPacket()
+      frameSet.sequenceNumber = this.outputSequenceNumber++
+      frameSet.frames.push(frame)
+      this.sendFrameSet(frameSet)
     }
   }
 
@@ -504,6 +538,12 @@ export class NetworkSession {
 
     // this.socket.addGuidSession(this)
     this.sendPacket(openConnectionReplyTwo)
+  }
+
+  private sendFrameSet(frameSet: FrameSetPacket): void {
+    // Add the frame into a backup queue
+    this.outputFrameSets.set(frameSet.sequenceNumber, frameSet)
+    this.sendPacket(frameSet)
   }
 
   public sendPacket<T extends Packet>(packet: T): void {

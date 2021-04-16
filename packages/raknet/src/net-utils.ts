@@ -50,7 +50,7 @@ export class NetUtils {
     } else if (rinfo.family === 'IPv6') {
       // TODO: support IPv6
       // stream.writeLShort(Info.AF_INET6)
-      stream.writeShort(rinfo.port)
+      stream.writeUnsignedShort(rinfo.port)
       stream.writeInt(0) // Flow info
       NetUtils.writeString(stream, rinfo.address)
       stream.writeInt(0) // Scope ID

@@ -12,7 +12,7 @@ export class Acknowledgement extends Packet {
   }
 
   public encode(stream: BinaryStream): void {
-    stream.writeShort(this.records.size)
+    stream.writeUnsignedShort(this.records.size)
     for (const record of this.records) {
       // May be tricky but i like this implementation
       stream.writeBoolean(record.isSingle())
@@ -26,7 +26,7 @@ export class Acknowledgement extends Packet {
   }
 
   public decode(stream: BinaryStream): void {
-    const records = stream.readShort()
+    const records = stream.readUnsignedShort()
     for (let i = 0; i < records; i++) {
       const single = stream.readBoolean()
       if (single) {

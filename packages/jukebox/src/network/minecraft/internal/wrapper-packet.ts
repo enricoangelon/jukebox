@@ -1,5 +1,5 @@
 import { Identifiers, Packet } from '@jukebox/raknet'
-import { deflateRaw, deflateRawSync, inflateRaw, inflateRawSync } from 'zlib'
+import { deflateRawSync, inflateRaw, inflateRawSync } from 'zlib'
 
 import { BinaryStream } from '@jukebox/binarystream'
 import { DataPacket } from './data-packet'
