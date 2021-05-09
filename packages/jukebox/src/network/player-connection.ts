@@ -1,46 +1,68 @@
-import * as Queue from 'promise-queue'
-import * as assert from 'assert'
-
 import { McpePlayStatus, PlayStatus } from './minecraft/play-status'
-import { createHash, randomBytes } from 'crypto'
+import {
+  McpeResourcePackResponse,
+  ResourcePackResponse,
+} from './minecraft/resource-pack-response'
+import { createHash, createPublicKey, randomBytes } from 'crypto'
 import { decode, sign, verify } from 'jsonwebtoken'
 
 import { BinaryStream } from '@jukebox/binarystream'
 import { ClientCacheStatus } from './minecraft/client-cache-status'
 import { ClientToServerHandshake } from './minecraft/client-to-server-handshake'
 import { DataPacket } from './minecraft/internal/data-packet'
-import { Encryption } from '../encryption'
+import { Difficulty } from '../world/difficulty'
+import { Dimension } from '../world/dimension'
 import { EncryptionContext } from './minecraft/encryption/encryption-context'
+import { EntityPlayer } from '../entity/entity-player'
 import { FrameReliability } from '@jukebox/raknet/lib/protocol/frame-reliability'
+import { Gamemode } from '../world/gamemode'
+import { Generator } from '../world/generator'
 import { Jukebox } from '../jukebox'
+import { McpeBiomeDefinitionList } from './minecraft/biome-definition-list'
+import { McpeChunkRadiusUpdated } from './minecraft/chunk-radius-updated'
+import { McpeCreativeContent } from './minecraft/creative-content'
 import { McpeLogin } from './minecraft/login'
+import { McpeRequestChunkRadius } from './minecraft/request-chunk-radius'
+import { McpeResourcePackStack } from './minecraft/resource-pack-stack'
 import { McpeResourcePacksInfo } from './minecraft/resource-packs-info'
 import { McpeServerToClientHandshake } from './minecraft/server-to-client-handshake'
+import { McpeSetLocalPlayerAsInitialized } from './minecraft/set-local-player-as-initialized'
+import { McpeStartGame } from './minecraft/start-game'
+import { McpeTickSync } from './minecraft/tick-sync'
 import { NetworkSession } from '@jukebox/raknet'
-import { Player } from '../player'
+import PromiseQueue from 'promise-queue'
 import { Protocol } from './protocol'
+import { Vector3 } from '../math/vector3'
 import { WrapperPacket } from './minecraft/internal/wrapper-packet'
+import assert from 'assert'
 
 export class PlayerConnection {
   private readonly networkSession: NetworkSession
-  private readonly player: Player | null = null
+  private readonly player: EntityPlayer
 
-  // More likely connection connected
+  // More likely connection related
   private cacheSupported: boolean
+
+  // Whatever the client is initialized inside the server
+  // so can receive packets and move / etc...
+  private initialized = false
 
   // Just if encryption is enabled
   private encryptionContext: EncryptionContext | null = null
-  private encryptionQueue = new Queue()
-  private decryptionQueue = new Queue()
+  private encryptionQueue = new PromiseQueue()
+  private decryptionQueue = new PromiseQueue()
 
-  private wrapperDecodingQueue = new Queue()
+  private wrapperDecodingQueue = new PromiseQueue()
   private outputPacketsQueue: Set<DataPacket> = new Set()
 
   public constructor(session: NetworkSession) {
     this.networkSession = session
+    this.player = new EntityPlayer(undefined, this)
   }
 
   public process(timestamp: number): void {
+    this.player.tick(timestamp)
+
     if (this.outputPacketsQueue.size > 0) {
       const wrapper = new WrapperPacket()
       const packetNames: Array<string> = []
@@ -51,9 +73,9 @@ export class PlayerConnection {
       }
 
       if (this.isEncryptionEnabled()) {
-        this.encryptWrapper(wrapper).then(encrypted => {
+        this.encryptWrapper(wrapper).then(encrypted =>
           this.networkSession.sendQueuedBuffer(encrypted)
-        })
+        )
       } else {
         this.networkSession.sendQueuedPacket(
           wrapper,
@@ -90,6 +112,26 @@ export class PlayerConnection {
         clientToServerHandshake.internalDecode(stream)
         this.handleClientToServerHandshake(clientToServerHandshake)
         break
+      case Protocol.RESOURCE_PACK_RESPONSE:
+        const resourcePackResponse = new McpeResourcePackResponse()
+        resourcePackResponse.internalDecode(stream)
+        this.handleResourcePackResponse(resourcePackResponse)
+        break
+      case Protocol.REQUEST_CHUNK_RADIUS:
+        const requestChunkRadius = new McpeRequestChunkRadius()
+        requestChunkRadius.internalDecode(stream)
+        this.handleRequestChunkRadius(requestChunkRadius)
+        break
+      case Protocol.TICK_SYNC:
+        const tickSync = new McpeTickSync()
+        tickSync.internalDecode(stream)
+        this.handleTickSync(tickSync)
+        break
+      case Protocol.SET_LOCAL_PLAYER_AS_INITIALIZED:
+        const setLocalPlayerAsInitialized = new McpeSetLocalPlayerAsInitialized()
+        setLocalPlayerAsInitialized.internalDecode(stream)
+        this.handleSetLocalPlayerAsInitialized(setLocalPlayerAsInitialized)
+        break
       default:
         // TODO: improve this with regex (probably)
         const hexId = id.toString(16)
@@ -106,7 +148,7 @@ export class PlayerConnection {
     this.wrapperDecodingQueue
       .add(() => wrapper.internalAsyncDecode(stream))
       .then(buffers => buffers.forEach(this.handle.bind(this)))
-      .catch(err => Jukebox.getLogger().error(err))
+      .catch(Jukebox.getLogger().error)
   }
 
   public handleDecrypted(buffer: Buffer): void {
@@ -121,7 +163,12 @@ export class PlayerConnection {
       checksum
     )
 
-    assert(checksumValid == true, 'Invalid encrypted packet checksum')
+    assert(
+      checksumValid == true,
+      `Invalid encrypted packet checksum expected ${
+        checksum.toJSON().data
+      } computed ${computedChecksum.toJSON().data}`
+    )
 
     const stream = new BinaryStream()
     stream.writeByte(0xfe) // Wrapper header
@@ -138,10 +185,8 @@ export class PlayerConnection {
       const buffer = stream.getBuffer().slice(1)
       this.decryptionQueue
         .add(() => this.encryptionContext!.decrypt(buffer))
-        .then(decrypted => {
-          this.handleDecrypted(decrypted)
-        })
-        .catch(err => Jukebox.getLogger().error(err))
+        .then(this.handleDecrypted.bind(this))
+        .catch(Jukebox.getLogger().error)
       return
     }
 
@@ -149,7 +194,10 @@ export class PlayerConnection {
   }
 
   private handleLogin(login: McpeLogin): void {
-    assert(this.player == null, 'Player already exists, handling login twice')
+    assert(
+      this.initialized == false,
+      'Player already exists, handling login twice'
+    )
     const gameProtocol = login.gameProtocol
     if (login.gameProtocol != Protocol.MC_PROTOCOL) {
       Jukebox.getLogger().error(
@@ -194,9 +242,18 @@ export class PlayerConnection {
 
       let clientRawPubKey = firstHeader.header.x5u
       for (const token of certChainData) {
-        const verified = verify(token, Encryption.rawToPem(clientRawPubKey), {
-          algorithms: ['ES384'],
-        }) as any
+        const publicKey = createPublicKey({
+          key: Buffer.from(clientRawPubKey, 'base64'),
+          format: 'der',
+          type: 'spki',
+        })
+        const verified = verify(
+          token,
+          publicKey.export({ format: 'pem', type: 'spki' }),
+          {
+            algorithms: ['ES384'],
+          }
+        ) as any
         assert(
           'identityPublicKey' in verified,
           'Missing public key in decoded token'
@@ -207,8 +264,14 @@ export class PlayerConnection {
       // Start encryption phase
       const serverToClientHandshake = new McpeServerToClientHandshake()
 
-      const sharedSecret = encryption.generateSharedSecret(clientRawPubKey)
+      const x509PubKey = Buffer.from(clientRawPubKey, 'base64')
+      const clientPubKey = createPublicKey({
+        key: x509PubKey,
+        format: 'der',
+        type: 'spki',
+      })
 
+      const sharedSecret = encryption.generateSharedSecret(clientPubKey)
       const salt = randomBytes(16)
 
       // Derive key as salted SHA-256 hash digest
@@ -216,26 +279,22 @@ export class PlayerConnection {
         .update(salt)
         .update(sharedSecret)
         .digest()
-      const encryptionIV = encryptionKey.slice(0, 12)
 
       serverToClientHandshake.jwtToken = sign(
         {
           salt: salt.toString('base64'),
         },
-        encryption.getPrivateKeyPEM(),
+        encryption.getPrivateKeyPEM().toString(),
         {
           algorithm: 'ES384',
-          header: { x5u: encryption.getPublicKeyX509() },
+          header: { x5u: encryption.getPublicKeyPEM().toString('base64') },
         }
       )
 
       this.sendImmediateDataPacket(serverToClientHandshake)
 
       // Used to notify that next batches are encrypted
-      this.encryptionContext = new EncryptionContext(
-        encryptionKey,
-        encryptionIV
-      )
+      this.encryptionContext = new EncryptionContext(encryptionKey)
       return
     }
 
@@ -248,6 +307,8 @@ export class PlayerConnection {
     this.sendImmediateDataPacket(playStatus)
 
     const resourcePacksInfo = new McpeResourcePacksInfo()
+    resourcePacksInfo.behaviorPacks = new Array(0)
+    resourcePacksInfo.resourcePacks = new Array(0)
     resourcePacksInfo.mustAccept = false
     resourcePacksInfo.hasScripts = false
     this.sendImmediateDataPacket(resourcePacksInfo)
@@ -269,17 +330,153 @@ export class PlayerConnection {
     this.continueLogin()
   }
 
+  private handleResourcePackResponse(packet: McpeResourcePackResponse): void {
+    // TODO: proper implementation
+    if (packet.status == ResourcePackResponse.HAVE_ALL_PACKS) {
+      const resourcePackStack = new McpeResourcePackStack()
+      resourcePackStack.forceAccept = false
+      resourcePackStack.behaviorPacks = new Array(0)
+      resourcePackStack.resourcePacks = new Array(0)
+      resourcePackStack.experiments = new Array(0)
+      resourcePackStack.alreadyEnabledExperiments = false
+      this.sendImmediateDataPacket(resourcePackStack)
+    } else if (packet.status == ResourcePackResponse.COMPLETED) {
+      this.doInitialSpawn()
+    }
+  }
+
+  private doInitialSpawn(): void {
+    const startGame = new McpeStartGame()
+    startGame.entityId = this.player.getRuntimeId()
+    startGame.runtimeEntityId = this.player.getRuntimeId()
+
+    startGame.playerGamemode = Gamemode.USE_WORLD
+    startGame.playerSpawnVector = this.player.getPosition()
+
+    startGame.pitch = 0
+    startGame.yaw = 0
+
+    startGame.seed = 0xdeadbeef
+    startGame.biomeType = 0
+    startGame.biomeName = ''
+    startGame.dimension = Dimension.OVERWORLD
+    startGame.generator = Generator.INFINITE
+    startGame.gamemode = Gamemode.SPECTATOR
+    startGame.difficulty = Difficulty.PEACEFUL
+    startGame.spawnVector = new Vector3(0, 6, 0)
+
+    startGame.hasAchievementsDisabled = true
+    startGame.dayCycleStopTime = 0
+
+    startGame.eduOffer = 0 // TODO: enum
+    startGame.eduFeaturesEnabled = false
+    startGame.eduProductId = ''
+
+    startGame.rainLevel = 0
+    startGame.lightningLevel = 0
+
+    startGame.hasConfirmedPlatformLockedContent = false
+
+    startGame.isMultiplayer = true
+    startGame.lanBroadcast = true
+    startGame.xblBroadcastMode = 0
+    startGame.platformBroadcastMode = 0
+
+    startGame.commandsEnabled = true
+    startGame.texturePacksRequired = false
+    startGame.gamerules = new Array(0)
+    startGame.experiments = new Array(0)
+    startGame.experimentsToggledBefore = false
+    startGame.hasBonusChestEnabled = false
+    startGame.hasStarterMapEnabled = false
+    startGame.permissionLevel = 0
+    startGame.chunkTickRange = 4
+    startGame.hasLockedBehaviorPack = false
+    startGame.hasLockedResourcePack = false
+    startGame.isFromLockedWorldTemplate = false
+    startGame.onlyMsaGamertags = false
+    startGame.isFromWorldTemplate = false
+    startGame.isWorldTemplateOptionLocked = false
+    startGame.spawnOnlyV1Villagers = false
+
+    startGame.limitedWorldHeight = 0
+    startGame.limitedWorldWidth = 0
+
+    startGame.hasNewNether = false
+    startGame.forceExperimentalGameplay = false
+
+    startGame.levelId = ''
+    startGame.worldName = 'Jukebox Server'
+    startGame.premiumWorldTemplateId = ''
+
+    startGame.isTrial = false
+    startGame.movementType = 0
+    startGame.rewindHistorySize = 0
+    startGame.serverAuthoritativeBlockBreaking = false
+
+    startGame.worldTicks = 0n
+
+    startGame.enchantmentSeed = 0
+
+    startGame.customBlocks = new Array(0)
+    startGame.itemPalette = new Array(0)
+
+    startGame.multiplayerCorrelationId = ''
+    // Soon client-side inventory will be deprecated
+    startGame.serverAuthoritativeInventory = true
+    this.sendQueuedDataPacket(startGame)
+
+    const creativeContent = new McpeCreativeContent()
+    creativeContent.entries = new Array(0)
+    this.sendQueuedDataPacket(creativeContent)
+
+    const biomeDefinitionList = new McpeBiomeDefinitionList()
+    this.sendQueuedDataPacket(biomeDefinitionList)
+
+    this.player.checkForNewChunks()
+
+    const playStatus = new McpePlayStatus()
+    playStatus.status = PlayStatus.PLAYER_SPAWN
+    this.sendQueuedDataPacket(playStatus)
+  }
+
+  private handleRequestChunkRadius(packet: McpeRequestChunkRadius): void {
+    this.player.viewRadius = packet.radius
+    const chunkRadiusUpdated = new McpeChunkRadiusUpdated()
+    chunkRadiusUpdated.radius = packet.radius
+    this.sendImmediateDataPacket(chunkRadiusUpdated)
+  }
+
+  private handleTickSync(packet: McpeTickSync): void {
+    const tickSync = new McpeTickSync()
+    tickSync.requestTimestamp = packet.responseTimestamp
+    tickSync.responseTimestamp = process.hrtime.bigint()
+    this.sendImmediateDataPacket(tickSync)
+  }
+
+  private handleSetLocalPlayerAsInitialized(
+    packet: McpeSetLocalPlayerAsInitialized
+  ): void {
+    assert(
+      this.getPlayerInstance().getRuntimeId() == packet.runtimeEntityId,
+      'Entity runtime id mismatch, some weird behavior happened!'
+    )
+    this.initialized = true
+  }
+
   public sendQueuedDataPacket<T extends DataPacket>(packet: T): void {
     this.outputPacketsQueue.add(packet)
   }
 
   private sendImmediateEncryptedWrapper(wrapper: WrapperPacket): void {
-    this.encryptWrapper(wrapper).then(encrypted => {
-      this.networkSession.sendInstantBuffer(
-        encrypted,
-        FrameReliability.RELIABLE_ORDERED
-      )
-    })
+    this.encryptWrapper(wrapper)
+      .then(encrypted => {
+        this.networkSession.sendInstantBuffer(
+          encrypted,
+          FrameReliability.RELIABLE_ORDERED
+        )
+      })
+      .catch(Jukebox.getLogger().error)
   }
 
   private async encryptWrapper(wrapper: WrapperPacket): Promise<Buffer> {
@@ -292,15 +489,11 @@ export class PlayerConnection {
     return new Promise((resolve, reject) => {
       this.encryptionQueue
         .add(() => this.encryptionContext!.encrypt(fullBuffer))
-        .then(encrypted => {
-          // Add the wrapper header
-          const stream = new BinaryStream()
-          stream.writeByte(0xfe)
-          stream.write(encrypted)
-
-          resolve(stream.getBuffer())
-        })
-        .catch(err => reject(err))
+        .then(encrypted =>
+          // Write the wrapper header
+          resolve(Buffer.concat([Buffer.from('fe', 'hex'), encrypted]))
+        )
+        .catch(reject)
     })
   }
 
@@ -321,6 +514,14 @@ export class PlayerConnection {
 
   public isEncryptionEnabled(): boolean {
     return this.encryptionContext != null
+  }
+
+  public isInitialized(): boolean {
+    return this.initialized
+  }
+
+  public getPlayerInstance(): EntityPlayer {
+    return this.player
   }
 
   public disconnect(): void {

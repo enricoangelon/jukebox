@@ -1,12 +1,15 @@
 import { NetEvents, NetworkSession, RakServer } from '@jukebox/raknet'
 
 import { BinaryStream } from '@jukebox/binarystream'
+import { BlockManager } from './block/block-manager'
 import { Config } from './config'
 import { Encryption } from './encryption'
+import { EntityPlayer } from './entity/entity-player'
 import { Logger } from '@jukebox/logger'
 import { PacketRegistry } from './network/packet-registry'
 import { PlayerConnection } from './network/player-connection'
 import { RemoteInfo } from 'dgram'
+import { ResourceManager } from './resources/resource-manager'
 import { resolve } from 'path'
 
 export class Jukebox {
@@ -15,6 +18,7 @@ export class Jukebox {
   private config: Required<Config>
   private connections: Map<RemoteInfo, PlayerConnection> = new Map()
   private encryption: Encryption | null = null
+  private running = true
 
   public constructor(config: Required<Config>) {
     this.config = config
@@ -28,7 +32,7 @@ export class Jukebox {
     this.start()
   }
 
-  public start(): void {
+  private start(): void {
     Jukebox.getLogger().info(
       'Starting Jukebox server for Minecraft bedrock edition...'
     )
@@ -41,6 +45,8 @@ export class Jukebox {
 
     // Init packet registry
     PacketRegistry.init()
+    ResourceManager.init()
+    BlockManager.init()
 
     // Init encryption
     if (Jukebox.getConfig().encryption != false) {
@@ -52,6 +58,12 @@ export class Jukebox {
 
     // Start the actual server
     this.server.addListener(NetEvents.GAME_PACKET, this.handleRawNetwork)
+    this.server.on(NetEvents.CLOSE_SESSION, (rinfo: RemoteInfo) => {
+      // We already know that connection is close, so we're safe doing it
+      if (this.connections.has(rinfo)) {
+        this.connections.delete(rinfo)
+      }
+    })
 
     try {
       this.server.start()
@@ -59,8 +71,9 @@ export class Jukebox {
       Jukebox.getLogger().fatal(err)
     }
 
-    // Tick connections every 1/20 seconds
-    setInterval(() => {
+    // Main server tick (every 1/20 seconds)
+    const tick = setInterval(() => {
+      this.running == false && clearInterval(tick)
       for (const conn of this.connections.values()) {
         // Timestamp in nanoseconds for debug purposes
         conn.process(process.hrtime()[1])
@@ -88,14 +101,29 @@ export class Jukebox {
     conn.handleWrapper(stream)
   }
 
-  public shutdown(): void {
-    this.server.close()
-    Jukebox.getLogger().info('Successfully closed the server socket!')
-
-    // TODO: implement shutdown
+  public getOnlinePlayers(): EntityPlayer[] {
+    return Array.from(this.connections.values())
+      .filter(conn => conn.isInitialized())
+      .map(conn => conn.getPlayerInstance())
   }
 
-  public static getServer(): RakServer {
+  public shutdown(): void {
+    // Close network provider
+    this.server.close()
+    // Stop ticking connections
+    this.running = false
+    // Remove all connections
+    this.connections.clear()
+    Jukebox.getLogger().info('Successfully closed the server socket!')
+
+    process.exit(0)
+  }
+
+  public static getServer(): Jukebox {
+    return Jukebox.instance
+  }
+
+  public static getRakServer(): RakServer {
     return Jukebox.instance.server
   }
 

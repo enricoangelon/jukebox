@@ -1,0 +1,11 @@
+{
+  "name": "@jukebox/nbt",
+  "version": "0.0.1",
+  "license": "MIT",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "author": "Jukebox authors",
+  "dependencies": {
+    "@jukebox/binarystream": "0.0.1"
+  }
+}

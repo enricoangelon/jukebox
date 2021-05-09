@@ -1,6 +1,5 @@
-import * as assert from 'assert'
-
 import { BinaryStream } from '@jukebox/binarystream'
+import assert from 'assert'
 
 export abstract class Packet {
   private readonly id: number

@@ -1,8 +1,6 @@
-import * as assert from 'assert'
-
 import { BinaryStream } from '@jukebox/binarystream'
-import { Jukebox } from '../../../jukebox'
 import { Packet } from '@jukebox/raknet'
+import assert from 'assert'
 
 export abstract class DataPacket extends Packet {
   public constructor(id: number) {
@@ -18,7 +16,7 @@ export abstract class DataPacket extends Packet {
     this.decode(stream)
     if (!stream.feof()) {
       const remaining = stream.getRemaining()
-      Jukebox.getLogger().debug(
+      throw new Error(
         `Still ${remaining.byteLength} unread bytes in ${this.constructor.name}: ${remaining}`
       )
     }

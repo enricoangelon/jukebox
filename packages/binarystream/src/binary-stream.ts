@@ -18,6 +18,10 @@ export class BinaryStream {
     return this.buffer.readUInt8(this.offset++)
   }
 
+  public readSignedByte(): number {
+    return this.buffer.readInt8(this.offset++)
+  }
+
   public writeByte(v: number): void {
     this.write(Buffer.from([v & 0xff]))
   }
@@ -46,6 +50,22 @@ export class BinaryStream {
 
   public readIntLE(): number {
     return this.buffer.readInt32LE((this.offset += 4) - 4)
+  }
+
+  public writeIntLE(v: number): void {
+    const buf = Buffer.alloc(4)
+    buf.writeInt32LE(v)
+    this.write(buf)
+  }
+
+  public readUnsignedIntLE(): number {
+    return this.buffer.readUInt32LE((this.offset += 4) - 4)
+  }
+
+  public writeUnsignedIntLE(v: number): void {
+    const buf = Buffer.alloc(4)
+    buf.writeUInt32LE(v, 0)
+    this.write(buf)
   }
 
   public writeInt(v: number): void {
@@ -78,16 +98,30 @@ export class BinaryStream {
     return this.buffer.readInt16BE((this.offset += 2) - 2)
   }
 
+  public readShortLE(): number {
+    return this.buffer.readInt16LE((this.offset += 2) - 2)
+  }
+
   public writeShort(v: number): void {
     const buf = Buffer.alloc(2)
-    buf.writeInt16BE(v, 0)
+    buf.writeInt16BE(v)
+    this.write(buf)
+  }
+
+  public writeShortLE(v: number): void {
+    const buf = Buffer.alloc(2)
+    buf.writeInt16LE(v)
     this.write(buf)
   }
 
   public writeUnsignedShortLE(v: number): void {
     const buf = Buffer.alloc(2)
-    buf.writeUInt16LE(v, 0)
+    buf.writeUInt16LE(v)
     this.write(buf)
+  }
+
+  public readUnsignedShortLE(): number {
+    return this.buffer.readUInt16LE((this.offset += 2) - 2)
   }
 
   public readUnsignedShort(): number {
@@ -104,9 +138,19 @@ export class BinaryStream {
     return this.buffer.readFloatBE((this.offset += 4) - 4)
   }
 
+  public readFloatLE(): number {
+    return this.buffer.readFloatLE((this.offset += 4) - 4)
+  }
+
+  public writeFloatLE(v: number): void {
+    const buf = Buffer.alloc(4)
+    buf.writeFloatLE(v)
+    this.write(buf)
+  }
+
   public writeFloat(v: number): void {
     const buf = Buffer.alloc(4)
-    buf.writeFloatBE(v, 0)
+    buf.writeFloatBE(0)
     this.write(buf)
   }
 
@@ -125,6 +169,16 @@ export class BinaryStream {
     this.write(buf)
   }
 
+  public readLongLE(): bigint {
+    return this.buffer.readBigInt64LE((this.offset += 8) - 8)
+  }
+
+  public writeLongLE(v: bigint): void {
+    const buf = Buffer.alloc(8)
+    buf.writeBigInt64LE(v)
+    this.write(buf)
+  }
+
   public readUnsignedInt(): number {
     return this.buffer.readUInt32BE((this.offset += 4) - 4)
   }
@@ -133,6 +187,18 @@ export class BinaryStream {
     const buf = Buffer.alloc(4)
     buf.writeUInt32BE(v, 0)
     this.write(buf)
+  }
+
+  public writeDoubleLE(v: number): void {}
+
+  public writeDouble(v: number): void {}
+
+  public readDoubleLE(): number {
+    return 0
+  }
+
+  public readDouble(): number {
+    return 0
   }
 
   private encodeZigZag32(v: number): number {
@@ -176,14 +242,55 @@ export class BinaryStream {
     this.writeByte(v & 0x7f)
   }
 
-  public readSignedVarInt(): number {
+  public readVarInt(): number {
     const val = this.readUnsignedVarInt()
     return this.decodeZigZag32(val)
   }
 
-  public writeSignedVarInt(v: number): void {
+  public writeVarInt(v: number): void {
     const val = this.encodeZigZag32(v)
     this.writeUnsignedVarInt(val)
+  }
+
+  public readVarLong(): bigint {
+    // TODO: fix and use encode zigzag function
+    const raw = this.readUnsignedVarLong()
+    const val = (((raw << 63n) >> 63n) ^ raw) >> 1n
+    return val ^ (raw & (1n << 63n))
+  }
+
+  public writeVarLong(v: bigint): void {
+    const val = this.encodeZigZag64(v)
+    this.writeUnsignedVarLong(val)
+  }
+
+  public readUnsignedVarLong(): bigint {
+    let value = 0
+    for (let i = 0; i <= 63; i += 7) {
+      if (this.feof()) {
+        throw new Error('No bytes left in buffer')
+      }
+      let b = this.readByte()
+      value |= (b & 0x7f) << i
+
+      if ((b & 0x80) === 0) {
+        return BigInt(value)
+      }
+    }
+
+    throw new Error('VarLong did not terminate after 10 bytes!')
+  }
+
+  public writeUnsignedVarLong(v: bigint): void {
+    for (let i = 0; i < 10; i++) {
+      if (v >> 7n !== 0n) {
+        this.writeByte(Number(v | 0x80n))
+      } else {
+        this.writeByte(Number(v & 0x7fn))
+        break
+      }
+      v >>= 7n
+    }
   }
 
   public setOffset(v: number): void {

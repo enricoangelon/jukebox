@@ -3,5 +3,10 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "lib"
-  }
+  },
+  "include": [
+    "src/**/**/*ts",
+    "src/resources/*/*.json",
+    "src/resources/*/*.nbt" // doesn't work
+  ]
 }

@@ -1,9 +1,8 @@
-import * as assert from 'assert'
-
 import { BinaryStream } from '@jukebox/binarystream'
 import { Frame } from './frame'
 import { FrameFlags } from './frame-flags'
 import { Packet } from '../packet'
+import assert from 'assert'
 
 // Represents the DatagramPacket
 export class FrameSetPacket extends Packet {

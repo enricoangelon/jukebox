@@ -8,6 +8,7 @@
   "author": "Jukebox authors",
   "dependencies": {
     "@jukebox/raknet": "0.0.1",
-    "@jukebox/logger": "0.0.1"
+    "@jukebox/logger": "0.0.1",
+    "@jukebox/nbt": "0.0.1"
   }
 }

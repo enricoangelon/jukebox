@@ -25,6 +25,12 @@ import { RakServer } from './server'
 import { RemoteInfo } from 'dgram'
 import { assert } from 'console'
 
+export interface SessionMetrics {
+  retransmitted: number
+  efficency: number
+  networkLoss: number
+}
+
 export class NetworkSession {
   private readonly socket: RakServer
   private readonly rinfo: RemoteInfo
@@ -55,6 +61,13 @@ export class NetworkSession {
   // Used to identify split packets
   private fragmentID = 0
 
+  // Used to calculate network efficency and packet loss
+  private metrics: SessionMetrics = {
+    retransmitted: 0,
+    efficency: 100,
+    networkLoss: 0,
+  }
+
   // fragmentID -> FragmentedFrame ( index -> buffer )
   private fragmentedFrames: Map<number, Map<number, Frame>> = new Map()
 
@@ -66,44 +79,55 @@ export class NetworkSession {
   }
 
   public tick(timestamp: number): void {
+    // Calculate metrics: https://manuals.gfi.com/en/exinda/help/content/exos/how-stuff-works/packet-loss.htm
+    // Efficency formula (percentage): 100 * (transferred - retransmitted) / transferred
+    this.metrics.efficency =
+      (100 * (this.outputSequenceNumber - this.metrics.retransmitted)) /
+      this.outputSequenceNumber
+    // Network loss formula: 100 - efficency
+    this.metrics.networkLoss = 100 - this.metrics.efficency
+
     // Acknowledge recived packets to the other end
     if (this.inputSequenceNumbers.size > 0) {
-      // Temporary solution because i am noob :(
       const records: Set<Record> = new Set()
-      for (const seq of this.inputSequenceNumbers) {
-        records.add(new SingleRecord(seq))
-      }
-
-      // Just a friendly logger... what's wrong with it... it's honest after all
-      const sequences = Array.from(this.inputSequenceNumbers)
-      this.logger.debug(
-        `Sent multiple single ACKs [${sequences.join(', ')}] to ${
-          this.rinfo.address
-        }:${this.rinfo.port}`
+      const sequences = Array.from(this.inputSequenceNumbers).sort(
+        (a, b) => a - b
       )
 
-      /* 
-      TODO: implement ranges
-      if (this.inputSequenceNumbers.size == 1) {
-        const sequenceNumber = this.inputSequenceNumbers.values().next().value
-        records.add(new SingleRecord(sequenceNumber))
-      } else {
-        let min = Math.min(...this.inputSequenceNumbers)
-        const max = Math.max(...this.inputSequenceNumbers)
-        for (let i = min; i <= max; i++) {
-          if (!this.inputSequenceNumbers.has(i)) {
-            records.add(new RangedRecord(min, i - 1))
+      const deleteSeqFromInputQueue = (seqNum: number) => {
+        if (!this.inputSequenceNumbers.has(seqNum)) {
+          this.logger.debug(
+            `Cannot find sequnece number (${seqNum}) in input queue`
+          )
+          return
+        }
+        this.inputSequenceNumbers.delete(seqNum)
+      }
+
+      for (let i = 1, continuous = 0; i <= sequences.length; i++) {
+        const prevSeq = sequences[i - 1]
+        // In the last iteration sequences[i] will be undefined, but it does its job correctly
+        if (sequences[i] - prevSeq == 1) {
+          continuous++
+        } else {
+          if (continuous == 0) {
+            records.add(new SingleRecord(prevSeq))
+            deleteSeqFromInputQueue(prevSeq)
           } else {
-            this.inputSequenceNumbers.delete(i)
+            const start = sequences[i - 1] - continuous
+            records.add(new RangedRecord(start, prevSeq))
+
+            for (let j = start; j < prevSeq; j++) {
+              deleteSeqFromInputQueue(j)
+            }
+            continuous = 0
           }
         }
       }
-      */
 
       const ack = new Acknowledgement()
       ack.records = records
       this.sendPacket(ack)
-      this.inputSequenceNumbers.clear()
     }
 
     // Not Acknowledge non received packets
@@ -159,7 +183,7 @@ export class NetworkSession {
       await this.handleOpenConnectionRequestOne(stream)
       return true
     } else if (packetId == Identifiers.OPEN_CONNECTION_REQUEST_2) {
-      await this.handleOpenConnectionRequestTwo(stream, rinfo)
+      await this.handleOpenConnectionRequestTwo(stream)
       return true
     }
 
@@ -227,7 +251,7 @@ export class NetworkSession {
 
         const connectedPong = new ConnectedPong()
         connectedPong.clientTimestamp = connectedPing.timestamp
-        connectedPong.timestamp = BigInt(Date.now())
+        connectedPong.timestamp = process.hrtime.bigint()
         this.sendInstantPacket(connectedPong)
         break
       case Identifiers.CONNECTION_REQUEST:
@@ -240,7 +264,7 @@ export class NetworkSession {
         const connectionRequestAccepted = new ConnectionRequestAccepted()
         connectionRequestAccepted.clientAddress = this.rinfo
         connectionRequestAccepted.clientTimestamp = connectionRequest.timestamp
-        connectionRequestAccepted.timestamp = BigInt(Date.now())
+        connectionRequestAccepted.timestamp = process.hrtime.bigint()
         this.sendInstantPacket(connectionRequestAccepted)
         break
       case Identifiers.NEW_INCOMING_CONNECTION:
@@ -378,7 +402,7 @@ export class NetworkSession {
       newFrame.reliability = frame.reliability
       newFrame.content = buffer
 
-      if (frame.isReliable()) {
+      if (newFrame.isReliable()) {
         newFrame.reliableIndex = this.outputReliableIndex++
         if (newFrame.isOrdered()) {
           newFrame.orderChannel = frame.orderChannel
@@ -425,6 +449,7 @@ export class NetworkSession {
   }
 
   private sendLostFrameSet(sequenceNumber: number): void {
+    this.metrics.retransmitted += 1
     if (this.outputFrameSets.has(sequenceNumber)) {
       const packet = this.outputFrameSets.get(sequenceNumber)!
       this.outputFrameSets.delete(sequenceNumber)
@@ -513,14 +538,13 @@ export class NetworkSession {
   }
 
   private async handleOpenConnectionRequestTwo(
-    stream: BinaryStream,
-    rinfo: RemoteInfo
+    stream: BinaryStream
   ): Promise<void> {
     const openConnectionRequestTwo = new OpenConnectionRequestTwo()
     openConnectionRequestTwo.internalDecode(stream)
 
     const openConnectionReplyTwo = new OpenConnectionReplyTwo()
-    openConnectionReplyTwo.clientAddress = rinfo
+    openConnectionReplyTwo.clientAddress = this.rinfo
     openConnectionReplyTwo.maximumTransferUnit =
       openConnectionRequestTwo.maximumTransferUnit
     openConnectionReplyTwo.serverGuid = this.socket.getGuid()

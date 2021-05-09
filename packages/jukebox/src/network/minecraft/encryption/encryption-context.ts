@@ -16,7 +16,8 @@ export class EncryptionContext {
   public decipher: DecipherGCM
   private decryptCounter = 0n
 
-  public constructor(encryptionKey: Buffer, encryptionIV: Buffer) {
+  public constructor(encryptionKey: Buffer) {
+    const encryptionIV = encryptionKey.slice(0, 12)
     this.encryptionKey = encryptionKey
     this.cipher = createCipheriv(
       EncryptionContext.ALGORITHM,
@@ -43,7 +44,7 @@ export class EncryptionContext {
   private computeChecksum(buffer: Buffer, countIndex: bigint): Buffer {
     const hash = createHash('sha256')
     const counter = Buffer.alloc(8)
-    counter.writeBigInt64LE(countIndex)
+    counter.writeBigUInt64LE(countIndex)
     hash.update(counter)
     hash.update(buffer)
     hash.update(this.encryptionKey)

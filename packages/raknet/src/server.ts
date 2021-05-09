@@ -4,6 +4,7 @@ import { RemoteInfo, Socket, createSocket } from 'dgram'
 import { BinaryStream } from '@jukebox/binarystream'
 import { EventEmitter } from 'events'
 import { Identifiers } from './identifiers'
+import { NetEvents } from './net-events'
 import { NetworkSession } from './session'
 import { Packet } from './packet'
 import { UnconnectedPing } from './protocol/offline/unconnected-ping'
@@ -42,8 +43,6 @@ export class RakServer extends EventEmitter {
     RakServer.socket.on('message', async (msg, rinfo) => {
       // The first byte identifies the packet
       const stream = new BinaryStream(msg)
-
-      // this.logger.debug('IN > ', stream.getBuffer())
 
       if (!(await this.handleUnconnected(stream, rinfo))) {
         const session = this.retriveSession(stream, rinfo)
@@ -129,6 +128,7 @@ export class RakServer extends EventEmitter {
     const token = `${rinfo.address}:${rinfo.port}`
     if (this.sessions.has(token)) {
       this.sessions.delete(token)
+      this.emit(NetEvents.CLOSE_SESSION, rinfo)
       this.logger.debug(`Closed session for ${token}`)
     } else {
       this.logger.error(`Cannot remove an unexisting session ${token}`)
