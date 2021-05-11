@@ -212,6 +212,7 @@ export class PlayerConnection {
         playStatus.status = PlayStatus.FAILED_CLIENT_OUTDATED
         this.sendImmediateDataPacket(playStatus)
       }
+      return
     }
 
     const certData = JSON.parse(login.chainData)
