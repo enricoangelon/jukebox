@@ -153,8 +153,8 @@ export class PlayerConnection {
 
   public handleDecrypted(buffer: Buffer): void {
     assert(this.encryptionContext != null, 'Failed to initialize encryption')
-    const wrapperBuffer = buffer.slice(0, buffer.byteLength - 8)
-    const checksum = buffer.slice(buffer.byteLength - 8, buffer.byteLength)
+    const wrapperBuffer = buffer.slice(0, buffer.length - 8)
+    const checksum = buffer.slice(buffer.length - 8, buffer.length)
     const computedChecksum = this.encryptionContext.computeDecryptChecksum(
       wrapperBuffer
     )
@@ -172,7 +172,7 @@ export class PlayerConnection {
 
     const stream = new BinaryStream()
     stream.writeByte(0xfe) // Wrapper header
-    stream.write(buffer)
+    stream.write(wrapperBuffer)
     stream.setOffset(0) // Reset offset after writing
 
     this.addWrapperToDecodingQueue(stream)
@@ -434,7 +434,7 @@ export class PlayerConnection {
     const biomeDefinitionList = new McpeBiomeDefinitionList()
     this.sendQueuedDataPacket(biomeDefinitionList)
 
-    this.player.checkForNewChunks()
+    // TODO: send chunks
 
     const playStatus = new McpePlayStatus()
     playStatus.status = PlayStatus.PLAYER_SPAWN

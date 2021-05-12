@@ -20,7 +20,7 @@
     "@types/xxhashjs": "^0.2.2",
     "ava": "2.4.0",
     "husky": "3.0.9",
-    "oao": "1.7.0",
+    "oao": "2.0.2",
     "prettier": "2.2.1",
     "pretty-quick": "2.0.0",
     "source-map-support": "0.5.16",

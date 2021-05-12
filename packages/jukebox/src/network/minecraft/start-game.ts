@@ -1,8 +1,8 @@
 import { BinaryStream } from '@jukebox/binarystream'
-import { Vector3 } from '../../math/vector3'
+import { DataPacket } from './internal/data-packet'
 import { McpeUtil } from '../mcpe-util'
 import { Protocol } from '../protocol'
-import { DataPacket } from './internal/data-packet'
+import { Vector3 } from '../../math/vector3'
 
 export class McpeStartGame extends DataPacket {
   public entityId: bigint
