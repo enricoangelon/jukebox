@@ -57,7 +57,8 @@ export class PlayerConnection {
 
   public constructor(session: NetworkSession) {
     this.networkSession = session
-    this.player = new EntityPlayer(undefined, this)
+    const world = Jukebox.getDefaultWorld()
+    this.player = new EntityPlayer(world, this)
   }
 
   public process(timestamp: number): void {
@@ -501,7 +502,10 @@ export class PlayerConnection {
   public sendImmediateDataPacket<T extends DataPacket>(packet: T): void {
     const wrapper = new WrapperPacket()
     wrapper.addPacket(packet)
+    this.sendImmediateWrapper(wrapper)
+  }
 
+  public sendImmediateWrapper(wrapper: WrapperPacket): void {
     if (this.isEncryptionEnabled()) {
       this.sendImmediateEncryptedWrapper(wrapper)
       return

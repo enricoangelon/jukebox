@@ -58,6 +58,10 @@ export class NetworkSession {
 
   // Used by ordered reliable frame sets
   private orderingIndexes: Map<number, number> = new Map()
+  // Input ordering queue
+  private inputOrderIndex: Map<number, number> = new Map()
+  private inputOrderingQueue: Map<number, Map<number, Frame>> = new Map()
+  private highestOrderIndex: Map<number, number> = new Map()
   // Used to identify split packets
   private fragmentID = 0
 
@@ -229,18 +233,71 @@ export class NetworkSession {
     }
 
     for (const frame of frameSetPacket.frames) {
+      this.processFrame(frame)
+    }
+  }
+
+  private processFrame(frame: Frame): void {
+    if (frame.isFragmented()) {
+      this.logger.debug(
+        `Recived a fragmented Frame fragmentSize=${frame.fragmentSize}, fragmentID=${frame.fragmentID}, fragmentIndex=${frame.fragmentIndex} from ${this.rinfo.address}:${this.rinfo.port}`
+      )
+      this.handleFragmentedFrame(frame)
+      return
+    }
+
+    if (frame.isSequenced()) {
+      if (this.highestOrderIndex.has(frame.orderChannel)) {
+        const highestOrderIndex = this.highestOrderIndex.get(
+          frame.orderChannel
+        )!
+        if (frame.sequenceIndex < highestOrderIndex) {
+          // packet is too old
+          return
+        }
+      } else {
+        this.highestOrderIndex.set(frame.orderChannel, frame.orderedIndex)
+      }
+
+      this.handleFrame(frame)
+    } else if (frame.isOrdered()) {
+      if (!this.inputOrderIndex.has(frame.orderChannel)) {
+        this.inputOrderIndex.set(frame.orderChannel, 0)
+        this.inputOrderingQueue.set(frame.orderChannel, new Map())
+      }
+
+      // Check if it's the next expected packet
+      const expectedOrderIndex = this.inputOrderIndex.get(frame.orderChannel)!
+      if (frame.orderedIndex == expectedOrderIndex) {
+        this.highestOrderIndex.set(frame.orderedIndex, 0)
+        // Update the next expected index
+        const nextExpectedOrderIndex = expectedOrderIndex + 1
+        this.inputOrderIndex.set(frame.orderChannel, nextExpectedOrderIndex)
+
+        this.handleFrame(frame)
+        const outOfOrderQueue = this.inputOrderingQueue.get(frame.orderChannel)!
+        let i = nextExpectedOrderIndex
+        for (; outOfOrderQueue.has(i); i++) {
+          const packet = outOfOrderQueue.get(i)!
+          this.handleFrame(packet)
+          outOfOrderQueue.delete(i)
+        }
+
+        this.inputOrderIndex.set(frame.orderChannel, i)
+      } else if (frame.orderedIndex > expectedOrderIndex) {
+        this.inputOrderingQueue
+          .get(frame.orderChannel)!
+          .set(frame.orderedIndex, frame)
+      } else {
+        // duplicated packet
+        return
+      }
+    } else {
       this.handleFrame(frame)
     }
   }
 
   private handleFrame(frame: Frame): void {
-    if (frame.isFragmented()) {
-      this.logger.debug(
-        `Recived a fragmented Frame fragmentSize=${frame.fragmentSize}, fragmentID=${frame.fragmentID}, fragmentIndex=${frame.fragmentIndex} from ${this.rinfo.address}:${this.rinfo.port}`
-      )
-      return this.handleFragmentedFrame(frame)
-    }
-
     const packetId = frame.content.readUInt8(0)
     const stream = new BinaryStream(frame.content)
 
@@ -308,8 +365,6 @@ export class NetworkSession {
           finalContent.write(splitContent.content)
         }
 
-        // TODO: not sure if i should set reliability
-        // of the first splitted packet, need to confirm
         const firstFrame = fragments.get(0)!
         const reliability = firstFrame.reliability
         const finalFrame = new Frame()
@@ -317,11 +372,11 @@ export class NetworkSession {
         finalFrame.reliability = reliability
         if (firstFrame.isOrdered()) {
           finalFrame.orderedIndex = firstFrame.orderedIndex
-          firstFrame.orderChannel = firstFrame.orderChannel
+          finalFrame.orderChannel = firstFrame.orderChannel
         }
 
         this.fragmentedFrames.delete(fragmentID)
-        this.handleFrame(finalFrame)
+        this.processFrame(finalFrame)
       }
     }
   }
@@ -360,10 +415,8 @@ export class NetworkSession {
     packet: T,
     reliability = FrameReliability.UNRELIABLE
   ): void {
-    const frame = new Frame()
-    frame.reliability = reliability
-    frame.content = packet.internalEncode()
-    this.sendQueuedFrame(frame)
+    const buffer = packet.internalEncode()
+    this.sendQueuedBuffer(buffer, reliability)
   }
 
   private getFilledFrame(frame: Frame): Frame {

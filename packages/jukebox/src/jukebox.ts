@@ -10,6 +10,7 @@ import { PacketRegistry } from './network/packet-registry'
 import { PlayerConnection } from './network/player-connection'
 import { RemoteInfo } from 'dgram'
 import { ResourceManager } from './resources/resource-manager'
+import { World } from './world/world'
 import { resolve } from 'path'
 
 export class Jukebox {
@@ -18,6 +19,7 @@ export class Jukebox {
   private config: Required<Config>
   private connections: Map<RemoteInfo, PlayerConnection> = new Map()
   private encryption: Encryption | null = null
+  private defaultWorld = new World()
   private running = true
 
   public constructor(config: Required<Config>) {
@@ -67,6 +69,7 @@ export class Jukebox {
 
     try {
       this.server.start()
+      Jukebox.getLogger().info('Succesfully loaded Jukebox software!')
     } catch (err) {
       Jukebox.getLogger().fatal(err)
     }
@@ -137,6 +140,10 @@ export class Jukebox {
 
   public static getEncryption(): Encryption | null {
     return Jukebox.instance.encryption
+  }
+
+  public static getDefaultWorld(): World {
+    return Jukebox.instance.defaultWorld
   }
 }
 

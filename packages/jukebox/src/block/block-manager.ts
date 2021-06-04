@@ -13,7 +13,7 @@ export class BlockManager {
     for (const stateContainer of blockStates) {
       if (stateContainer.meta > 15) continue // No one knows why we have meta bigger than 15
       if (stateContainer.name == 'minecraft:stone') {
-        console.log(inspect(stateContainer, { depth: null, showHidden: true }))
+        // console.log(inspect(stateContainer, { depth: null, showHidden: true }))
       }
       this.legacyToRuntimeId.set(
         (stateContainer.legacyId << 4) | stateContainer.meta,
