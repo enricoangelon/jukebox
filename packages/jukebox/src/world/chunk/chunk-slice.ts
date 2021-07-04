@@ -63,7 +63,7 @@ export class ChunkSlice {
         word |= state << (bitsPerBlock * block)
         position++
       }
-      stream.writeIntLE(word)
+      stream.writeUnsignedIntLE(word)
     }
 
     stream.writeVarInt(this.palette.length)
