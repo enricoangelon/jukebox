@@ -3,8 +3,6 @@ import { ResourceManager } from '../resources/resource-manager'
 import assert from 'assert'
 
 export class BlockManager {
-  private static legacyToRuntimeId: Map<number, number> = new Map()
-  private static runtimeToLegacyId: Map<number, number> = new Map()
   private static blockStateMappings: Map<
     string,
     BlockStateContainer
@@ -18,14 +16,6 @@ export class BlockManager {
     const blockStates = ResourceManager.computeBlockStates()
     for (const stateContainer of blockStates) {
       this.blockStateMappings.set(stateContainer.name, stateContainer)
-      this.legacyToRuntimeId.set(
-        (stateContainer.legacyId << 4) | stateContainer.meta,
-        stateContainer.runtimeId
-      )
-      this.runtimeToLegacyId.set(
-        stateContainer.runtimeId,
-        (stateContainer.legacyId << 4) | stateContainer.meta
-      )
     }
   }
 
@@ -43,12 +33,5 @@ export class BlockManager {
     }
     const state = this.blockStateMappings.get(blockName)!
     return state.runtimeId
-  }
-
-  public static getRuntimeByLegacyId(legacyId: number, meta: number): number {
-    return (
-      this.legacyToRuntimeId.get((legacyId << 4) | meta) ??
-      this.getRuntimeId('minecraft:air')
-    )
   }
 }

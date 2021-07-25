@@ -50,23 +50,9 @@ export class ResourceManager {
     // Every state represents something like a block id + meta
     let runtimeId = 0
 
-    const metaCounter: Map<string, number> = new Map()
     do {
       const vanillaBlock = reader.parse()
       const vanillaBlockName = vanillaBlock.getString('name', 'unknown')
-
-      if (!metaCounter.has(vanillaBlockName)) {
-        metaCounter.set(vanillaBlockName, 0)
-      } else {
-        const meta = metaCounter.get(vanillaBlockName)!
-        metaCounter.set(vanillaBlockName, meta + 1)
-      }
-
-      if (!Object.keys(legacyIds).includes(vanillaBlockName)) {
-        Jukebox.getLogger().debug(
-          `Legacy id mapping not found for block=${vanillaBlockName}`
-        )
-      }
 
       const stateContainer = <BlockStateContainer>{}
       stateContainer.name = vanillaBlockName
@@ -82,11 +68,6 @@ export class ResourceManager {
       }
       stateContainer.states = blockStates
       stateContainer.runtimeId = runtimeId++
-
-      // Legacy Ids compatibility for anvil
-      const meta = metaCounter.get(vanillaBlockName)!
-      stateContainer.meta = meta
-      stateContainer.legacyId = (legacyIds as any)[vanillaBlockName] ?? -1
 
       states.add(stateContainer)
     } while (!stream.feof())
