@@ -1,6 +1,6 @@
 import { BinaryStream } from '@jukebox/binarystream'
-import { Protocol } from '../protocol'
 import { DataPacket } from './internal/data-packet'
+import { Protocol } from '../protocol'
 
 export class McpeChunkRadiusUpdated extends DataPacket {
   public radius: number

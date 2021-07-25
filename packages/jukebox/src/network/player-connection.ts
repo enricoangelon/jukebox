@@ -16,7 +16,7 @@ import { EncryptionContext } from './minecraft/encryption/encryption-context'
 import { EntityPlayer } from '../entity/entity-player'
 import { FrameReliability } from '@jukebox/raknet/lib/protocol/frame-reliability'
 import { Gamemode } from '../world/gamemode'
-import { Generator } from '../world/generator'
+import { Generator } from '../world/generator/generator'
 import { Jukebox } from '../jukebox'
 import { McpeBiomeDefinitionList } from './minecraft/biome-definition-list'
 import { McpeChunkRadiusUpdated } from './minecraft/chunk-radius-updated'
@@ -34,7 +34,12 @@ import PromiseQueue from 'promise-queue'
 import { Protocol } from './protocol'
 import { Vector3 } from '../math/vector3'
 import { WrapperPacket } from './minecraft/internal/wrapper-packet'
+import { PlayerLoginData } from './player-login-data'
 import assert from 'assert'
+import { McpeText } from './minecraft/text'
+import { McpeMovePlayer } from './minecraft/move-player'
+import { McpeNetworkChunkPublisherUpdate } from './minecraft/network-chunk-publisher-update'
+import { McpePlayerList, PlayerListAction } from './minecraft/player-list'
 
 export class PlayerConnection {
   private readonly networkSession: NetworkSession
@@ -49,21 +54,17 @@ export class PlayerConnection {
 
   // Just if encryption is enabled
   private encryptionContext: EncryptionContext | null = null
-  private encryptionQueue = new PromiseQueue()
-  private decryptionQueue = new PromiseQueue()
 
   private wrapperDecodingQueue = new PromiseQueue()
   private outputPacketsQueue: Set<DataPacket> = new Set()
 
   public constructor(session: NetworkSession) {
     this.networkSession = session
-    const world = Jukebox.getDefaultWorld()
+    const world = Jukebox.getWorld()
     this.player = new EntityPlayer(world, this)
   }
 
   public process(timestamp: number): void {
-    this.player.tick(timestamp)
-
     if (this.outputPacketsQueue.size > 0) {
       const wrapper = new WrapperPacket()
       const packetNames: Array<string> = []
@@ -75,7 +76,10 @@ export class PlayerConnection {
 
       if (this.isEncryptionEnabled()) {
         this.encryptWrapper(wrapper).then(encrypted =>
-          this.networkSession.sendQueuedBuffer(encrypted)
+          this.networkSession.sendQueuedBuffer(
+            encrypted,
+            FrameReliability.RELIABLE_ORDERED
+          )
         )
       } else {
         this.networkSession.sendQueuedPacket(
@@ -133,6 +137,16 @@ export class PlayerConnection {
         setLocalPlayerAsInitialized.internalDecode(stream)
         this.handleSetLocalPlayerAsInitialized(setLocalPlayerAsInitialized)
         break
+      case Protocol.TEXT:
+        const text = new McpeText()
+        text.internalDecode(stream)
+        this.handleText(text)
+        break
+      case Protocol.MOVE_PLAYER:
+        const movePlayer = new McpeMovePlayer()
+        movePlayer.internalDecode(stream)
+        this.handleMovePlayer(movePlayer)
+        break
       default:
         // TODO: improve this with regex (probably)
         const hexId = id.toString(16)
@@ -143,6 +157,8 @@ export class PlayerConnection {
         )
     }
   }
+
+  /** INTERNAL PROTOCOL */
 
   private addWrapperToDecodingQueue(stream: BinaryStream): void {
     const wrapper = new WrapperPacket()
@@ -184,7 +200,8 @@ export class PlayerConnection {
       assert(this.encryptionContext != null, 'Failed to initialize encryption')
       // Skip the wrapper header and decrypt the "content"
       const buffer = stream.getBuffer().slice(1)
-      this.decryptionQueue
+      this.encryptionContext
+        .getDecryptionQueue()
         .add(() => this.encryptionContext!.decrypt(buffer))
         .then(this.handleDecrypted.bind(this))
         .catch(Jukebox.getLogger().error)
@@ -193,6 +210,60 @@ export class PlayerConnection {
 
     this.addWrapperToDecodingQueue(stream)
   }
+
+  public sendQueuedDataPacket<T extends DataPacket>(packet: T): void {
+    this.outputPacketsQueue.add(packet)
+  }
+
+  private sendImmediateEncryptedWrapper(wrapper: WrapperPacket): void {
+    this.encryptWrapper(wrapper)
+      .then(encrypted => {
+        this.networkSession.sendInstantBuffer(
+          encrypted,
+          FrameReliability.RELIABLE_ORDERED
+        )
+      })
+      .catch(Jukebox.getLogger().error)
+  }
+
+  private async encryptWrapper(wrapper: WrapperPacket): Promise<Buffer> {
+    assert(this.encryptionContext != null, 'Failed to initialize encryption!')
+    // Encode the buffer and skip the header, theorically should
+    // return wrapper header + zlib encoded packets content
+    const zippedBuffer = wrapper.internalEncode().slice(1)
+    const checksum = this.encryptionContext.computeEncryptChecksum(zippedBuffer)
+    const fullBuffer = Buffer.concat([zippedBuffer, checksum])
+    return new Promise((resolve, reject) => {
+      this.encryptionContext
+        ?.getEncryptionQueue()
+        .add(() => this.encryptionContext!.encrypt(fullBuffer))
+        .then(encrypted =>
+          // Write the wrapper header
+          resolve(Buffer.concat([Buffer.from('fe', 'hex'), encrypted]))
+        )
+        .catch(reject)
+    })
+  }
+
+  public sendImmediateDataPacket<T extends DataPacket>(packet: T): void {
+    const wrapper = new WrapperPacket()
+    wrapper.addPacket(packet)
+    this.sendImmediateWrapper(wrapper)
+  }
+
+  public sendImmediateWrapper(wrapper: WrapperPacket): void {
+    if (this.isEncryptionEnabled()) {
+      this.sendImmediateEncryptedWrapper(wrapper)
+      return
+    }
+
+    this.networkSession.sendInstantPacket(
+      wrapper,
+      FrameReliability.RELIABLE_ORDERED
+    )
+  }
+
+  /** MINECRAFT HANDLERS */
 
   private handleLogin(login: McpeLogin): void {
     assert(
@@ -224,6 +295,26 @@ export class PlayerConnection {
       Jukebox.getLogger().error('Received an invalid McpeLogin certificate')
       return
     }
+
+    const decodedSkinData = decode(login.skinData)
+    const extraData = (certChainData
+      .map(cert => decode(cert))
+      .filter(chain => 'extraData' in (chain as any))[0] as any).extraData
+
+    const playerData = <PlayerLoginData>(
+      Object.assign({}, extraData, decodedSkinData)
+    )
+
+    // Check if the player is already online with the same account
+    if (Jukebox.getServer().getOnlinePlayer(playerData.displayName)) {
+      // TODO: disconnect
+    }
+
+    this.player.setLoginData(playerData)
+
+    Jukebox.getLogger().info(
+      `Player ${playerData.displayName} is attempting to join...`
+    )
 
     if (Jukebox.getConfig().encryption != false) {
       const encryption = Jukebox.getEncryption()
@@ -303,19 +394,6 @@ export class PlayerConnection {
     this.continueLogin()
   }
 
-  private continueLogin(): void {
-    const playStatus = new McpePlayStatus()
-    playStatus.status = PlayStatus.LOGIN_SUCCESS
-    this.sendImmediateDataPacket(playStatus)
-
-    const resourcePacksInfo = new McpeResourcePacksInfo()
-    resourcePacksInfo.behaviorPacks = new Array(0)
-    resourcePacksInfo.resourcePacks = new Array(0)
-    resourcePacksInfo.mustAccept = false
-    resourcePacksInfo.hasScripts = false
-    this.sendImmediateDataPacket(resourcePacksInfo)
-  }
-
   private handleClientCacheStatus(packet: ClientCacheStatus): void {
     this.cacheSupported = packet.supported
     Jukebox.getLogger().debug(`Client cache support: ${this.cacheSupported}`)
@@ -347,13 +425,55 @@ export class PlayerConnection {
     }
   }
 
+  private handleText(packet: McpeText): void {
+    // Jukebox.getServer().emit('global_packet', packet)
+    for (const player of Jukebox.getServer().getOnlinePlayers()) {
+      player.getConnection().sendImmediateDataPacket(packet)
+    }
+  }
+
+  private handleMovePlayer(packet: McpeMovePlayer): void {
+    this.player.move(packet.position, packet.rotation)
+  }
+
+  private handleTickSync(packet: McpeTickSync): void {
+    const tickSync = new McpeTickSync()
+    tickSync.requestTimestamp = packet.responseTimestamp
+    tickSync.responseTimestamp = process.hrtime.bigint()
+    this.sendImmediateDataPacket(tickSync)
+  }
+
+  private handleRequestChunkRadius(packet: McpeRequestChunkRadius): void {
+    this.player.setViewRadius(packet.radius / 2)
+
+    // Send spawn chunks
+    this.sendNetworkChunkPublisherUpdate(this.player.getViewRadius())
+    this.player.sendNewChunks(6).finally(() => {
+      const playStatus = new McpePlayStatus()
+      playStatus.status = PlayStatus.PLAYER_SPAWN
+      this.sendImmediateDataPacket(playStatus)
+    })
+  }
+
+  private handleSetLocalPlayerAsInitialized(
+    packet: McpeSetLocalPlayerAsInitialized
+  ): void {
+    assert(
+      this.getPlayerInstance().getRuntimeId() == packet.runtimeEntityId,
+      'Entity runtime id mismatch, some weird behavior happened!'
+    )
+    this.initialized = true
+  }
+
+  /** MINECRAFT PROTOCOL */
+
   private doInitialSpawn(): void {
     const startGame = new McpeStartGame()
     startGame.entityId = this.player.getRuntimeId()
     startGame.runtimeEntityId = this.player.getRuntimeId()
 
     startGame.playerGamemode = Gamemode.USE_WORLD
-    startGame.playerSpawnVector = this.player.getPosition()
+    startGame.playerSpawnVector = this.player.getPosition().add(0, 6, 0) // TODO: test purpose
 
     startGame.pitch = 0
     startGame.yaw = 0
@@ -362,8 +482,8 @@ export class PlayerConnection {
     startGame.biomeType = 0
     startGame.biomeName = ''
     startGame.dimension = Dimension.OVERWORLD
-    startGame.generator = Generator.INFINITE
-    startGame.gamemode = Gamemode.SPECTATOR
+    startGame.generator = Generator.FLAT
+    startGame.gamemode = Gamemode.CREATIVE
     startGame.difficulty = Difficulty.PEACEFUL
     startGame.spawnVector = new Vector3(0, 6, 0)
 
@@ -391,7 +511,7 @@ export class PlayerConnection {
     startGame.experimentsToggledBefore = false
     startGame.hasBonusChestEnabled = false
     startGame.hasStarterMapEnabled = false
-    startGame.permissionLevel = 0
+    startGame.permissionLevel = 3
     startGame.chunkTickRange = 4
     startGame.hasLockedBehaviorPack = false
     startGame.hasLockedResourcePack = false
@@ -426,6 +546,7 @@ export class PlayerConnection {
     startGame.multiplayerCorrelationId = ''
     // Soon client-side inventory will be deprecated
     startGame.serverAuthoritativeInventory = true
+    startGame.softwareVersion = 'Jukebox v0.0.1'
     this.sendQueuedDataPacket(startGame)
 
     const creativeContent = new McpeCreativeContent()
@@ -434,87 +555,44 @@ export class PlayerConnection {
 
     const biomeDefinitionList = new McpeBiomeDefinitionList()
     this.sendQueuedDataPacket(biomeDefinitionList)
-
-    // TODO: send chunks
-
-    const playStatus = new McpePlayStatus()
-    playStatus.status = PlayStatus.PLAYER_SPAWN
-    this.sendQueuedDataPacket(playStatus)
   }
 
-  private handleRequestChunkRadius(packet: McpeRequestChunkRadius): void {
-    this.player.viewRadius = packet.radius
+  private continueLogin(): void {
+    const playStatus = new McpePlayStatus()
+    playStatus.status = PlayStatus.LOGIN_SUCCESS
+    this.sendImmediateDataPacket(playStatus)
+
+    const resourcePacksInfo = new McpeResourcePacksInfo()
+    resourcePacksInfo.behaviorPacks = new Array(0)
+    resourcePacksInfo.resourcePacks = new Array(0)
+    resourcePacksInfo.mustAccept = false
+    resourcePacksInfo.hasScripts = false
+    resourcePacksInfo.forceAccept = false
+    this.sendImmediateDataPacket(resourcePacksInfo)
+  }
+
+  public sendNetworkChunkPublisherUpdate(radius: number): void {
+    const networkChunkPublisherUpdate = new McpeNetworkChunkPublisherUpdate()
+    networkChunkPublisherUpdate.position = this.player.getPosition().toFloor()
+    networkChunkPublisherUpdate.radius = radius * 16
+    this.sendImmediateDataPacket(networkChunkPublisherUpdate)
+  }
+
+  public sendChunkRadiusUpdated(radius: number): void {
     const chunkRadiusUpdated = new McpeChunkRadiusUpdated()
-    chunkRadiusUpdated.radius = packet.radius
+    chunkRadiusUpdated.radius = radius
     this.sendImmediateDataPacket(chunkRadiusUpdated)
   }
 
-  private handleTickSync(packet: McpeTickSync): void {
-    const tickSync = new McpeTickSync()
-    tickSync.requestTimestamp = packet.responseTimestamp
-    tickSync.responseTimestamp = process.hrtime.bigint()
-    this.sendImmediateDataPacket(tickSync)
-  }
-
-  private handleSetLocalPlayerAsInitialized(
-    packet: McpeSetLocalPlayerAsInitialized
-  ): void {
-    assert(
-      this.getPlayerInstance().getRuntimeId() == packet.runtimeEntityId,
-      'Entity runtime id mismatch, some weird behavior happened!'
-    )
-    this.initialized = true
-  }
-
-  public sendQueuedDataPacket<T extends DataPacket>(packet: T): void {
-    this.outputPacketsQueue.add(packet)
-  }
-
-  private sendImmediateEncryptedWrapper(wrapper: WrapperPacket): void {
-    this.encryptWrapper(wrapper)
-      .then(encrypted => {
-        this.networkSession.sendInstantBuffer(
-          encrypted,
-          FrameReliability.RELIABLE_ORDERED
-        )
-      })
-      .catch(Jukebox.getLogger().error)
-  }
-
-  private async encryptWrapper(wrapper: WrapperPacket): Promise<Buffer> {
-    assert(this.encryptionContext != null, 'Failed to initialize encryption!')
-    // Encode the buffer and skip the header, theorically should
-    // return wrapper header + zlib encoded packets content
-    const zippedBuffer = wrapper.internalEncode().slice(1)
-    const checksum = this.encryptionContext.computeEncryptChecksum(zippedBuffer)
-    const fullBuffer = Buffer.concat([zippedBuffer, checksum])
-    return new Promise((resolve, reject) => {
-      this.encryptionQueue
-        .add(() => this.encryptionContext!.encrypt(fullBuffer))
-        .then(encrypted =>
-          // Write the wrapper header
-          resolve(Buffer.concat([Buffer.from('fe', 'hex'), encrypted]))
-        )
-        .catch(reject)
-    })
-  }
-
-  public sendImmediateDataPacket<T extends DataPacket>(packet: T): void {
-    const wrapper = new WrapperPacket()
-    wrapper.addPacket(packet)
-    this.sendImmediateWrapper(wrapper)
-  }
-
-  public sendImmediateWrapper(wrapper: WrapperPacket): void {
-    if (this.isEncryptionEnabled()) {
-      this.sendImmediateEncryptedWrapper(wrapper)
-      return
+  public sendUpdatedPlayerList(): void {
+    // TODO: restructure this
+    const playerList = new McpePlayerList()
+    playerList.action = PlayerListAction.ADD
+    playerList.playerEntries = [this.player]
+    for (const player of Jukebox.getServer().getPlayerList()) {
+      player.getConnection().sendImmediateDataPacket(playerList)
     }
-
-    this.networkSession.sendInstantPacket(
-      wrapper,
-      FrameReliability.RELIABLE_ORDERED
-    )
+    Jukebox.getServer().getPlayerList().push(this.player)
   }
 
   public isEncryptionEnabled(): boolean {

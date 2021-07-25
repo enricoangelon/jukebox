@@ -3,8 +3,9 @@ import { deflateRawSync, inflateRaw, inflateRawSync } from 'zlib'
 
 import { BinaryStream } from '@jukebox/binarystream'
 import { DataPacket } from './data-packet'
-import { assert } from 'console'
 import { promisify } from 'util'
+
+const asyncInflateRaw = promisify(inflateRaw)
 
 export class WrapperPacket extends Packet {
   private content = new BinaryStream()
@@ -21,13 +22,18 @@ export class WrapperPacket extends Packet {
   }
 
   public decode(stream: BinaryStream): void {
-    this.content.write(inflateRawSync(stream.getRemaining()))
+    this.content.write(
+      inflateRawSync(stream.getRemaining(), {
+        level: this.compressionLevel,
+        maxOutputLength: 1024 * 1024 * 2,
+      })
+    )
   }
 
   private async asyncDecode(stream: BinaryStream): Promise<void> {
-    const asyncInflateRaw = promisify(inflateRaw)
     const unzippedBuffer = await asyncInflateRaw(stream.getRemaining(), {
       level: this.compressionLevel,
+      maxOutputLength: 1024 * 1024 * 2,
     })
     this.content.write(unzippedBuffer)
   }
@@ -40,7 +46,6 @@ export class WrapperPacket extends Packet {
   }
 
   public addPacket(dataPacket: DataPacket): void {
-    assert(dataPacket.isEncoded() == false, 'DataPacket is already encoded')
     const buffer = dataPacket.internalEncode()
     this.content.writeUnsignedVarInt(buffer.byteLength)
     this.content.write(buffer)
@@ -55,5 +60,9 @@ export class WrapperPacket extends Packet {
       buffers.push(slice)
     } while (!this.content.feof())
     return buffers
+  }
+
+  public setCompressionLevel(level: number): void {
+    this.compressionLevel = level
   }
 }

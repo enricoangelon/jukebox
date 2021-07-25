@@ -11,6 +11,7 @@ import { UnconnectedPing } from './protocol/offline/unconnected-ping'
 import { UnconnectedPong } from './protocol/offline/unconnected-pong'
 import { assert } from 'console'
 import { randomBytes } from 'crypto'
+import { Info } from './info'
 
 export class RakServer extends EventEmitter {
   private static socket: Socket
@@ -20,7 +21,7 @@ export class RakServer extends EventEmitter {
   private readonly guid: bigint
   private readonly logger: Logger
   private readonly port: number
-  private readonly running = true
+  private running = true
 
   public constructor(port: number, maxConnections: number, logger?: Logger) {
     super()
@@ -37,7 +38,15 @@ export class RakServer extends EventEmitter {
     })
 
     RakServer.socket.bind(this.port, () => {
-      this.emit('listening', this.port)
+      this.emit(NetEvents.LISTENING, this.port)
+      // Sync handle all sessions
+      const tick = setInterval(() => {
+        if (!this.running) {
+          clearInterval(tick)
+        }
+
+        this.emit(NetEvents.TICK, Date.now())
+      }, Info.RAKNET_TICK_TIME)
     })
 
     RakServer.socket.on('message', async (msg, rinfo) => {
@@ -47,23 +56,12 @@ export class RakServer extends EventEmitter {
       if (!(await this.handleUnconnected(stream, rinfo))) {
         const session = this.retriveSession(stream, rinfo)
         if (session != null) {
-          await session.handle(stream, rinfo)
+          await session.handle(stream)
         } else {
           return
         }
       }
     })
-
-    // Sync handle all sessions
-    const tick = setInterval(() => {
-      if (!this.running) {
-        clearInterval(tick)
-      }
-
-      for (const session of this.sessions.values()) {
-        session.tick(Date.now())
-      }
-    }, 50)
   }
 
   private async handleUnconnected(
@@ -98,7 +96,7 @@ export class RakServer extends EventEmitter {
 
     // TODO: event, so we can change the motd
     const motd =
-      'MCPE;Test motd;428;1.16.210;0;20;' + this.guid + ';Second line;Creative;'
+      'MCPE;Test motd;440;1.17.0;0;20;' + this.guid + ';Second line;Creative;'
     // this.emit('motd')
 
     unconnectedPong.data = motd
@@ -135,17 +133,12 @@ export class RakServer extends EventEmitter {
     }
   }
 
-  // public hasClientGuid(guid: bigint | null): boolean {
-  //  return guid != null ? this.guidConnections.has(guid) : false
-  // }
-
-  // public addGuidSession(session: NetworkSession): void {
-  //  this.guidConnections.set(session.getGuid(), session)
-  // }
-
   public close(): void {
     this.getSocket().close()
-    // TODO: close each connection
+    // TODO: finish to send last packets before closing listeners
+    // TODO: close each session
+    this.running = false
+    this.removeAllListeners()
   }
 
   public getGuid(): bigint {

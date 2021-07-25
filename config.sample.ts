@@ -10,6 +10,7 @@ export default <Config>{
       surfaceBlock: 'GRASS',
     }*/),
   ],
+  defaultWorld: 'world',
   logger: new DevLogger(/*{ saveToFile: false }*/),
   lang: 'en_US',
   filesystem: null, // Can optionally be in memory

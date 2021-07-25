@@ -5,10 +5,14 @@ import {
   createDecipheriv,
   createHash,
 } from 'crypto'
+import PromiseQueue from 'promise-queue'
 
 export class EncryptionContext {
   public static readonly ALGORITHM = 'aes-256-gcm'
   private readonly encryptionKey: Buffer
+
+  private encryptionQueue = new PromiseQueue()
+  private decryptionQueue = new PromiseQueue()
 
   public cipher: CipherGCM
   private encryptCounter = 0n
@@ -74,5 +78,13 @@ export class EncryptionContext {
         reject(err)
       }
     })
+  }
+
+  public getEncryptionQueue(): PromiseQueue {
+    return this.encryptionQueue
+  }
+
+  public getDecryptionQueue(): PromiseQueue {
+    return this.decryptionQueue
   }
 }

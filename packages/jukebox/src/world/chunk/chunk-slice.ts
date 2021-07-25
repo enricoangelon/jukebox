@@ -5,12 +5,8 @@ import { assert } from 'console'
 export class ChunkSlice {
   private static readonly DATA_SIZE = 4096
 
-  private readonly palette: Array<number> = [BlockManager.getRuntimeId(0, 0)]
-  private readonly blocks: Array<number> = new Array(ChunkSlice.DATA_SIZE)
-
-  public constructor() {
-    this.blocks.fill(0)
-  }
+  private readonly palette = [BlockManager.getRuntimeId('minecraft:air')]
+  private readonly blocks: number[] = new Array(ChunkSlice.DATA_SIZE).fill(0)
 
   public getRuntimeId(x: number, y: number, z: number): number {
     ChunkSlice.checkBounds(x, y, z)

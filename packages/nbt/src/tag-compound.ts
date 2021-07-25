@@ -131,6 +131,12 @@ export class NBTTagCompound {
       : defaultValue
   }
 
+  public getByteArray(name: string, defaultValue: Buffer): Buffer {
+    return this.children.has(name)
+      ? (this.children.get(name) as Buffer)
+      : defaultValue
+  }
+
   public remove(key: string): boolean {
     return this.children.delete(key)
   }

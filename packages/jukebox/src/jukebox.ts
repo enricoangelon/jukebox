@@ -10,25 +10,30 @@ import { PacketRegistry } from './network/packet-registry'
 import { PlayerConnection } from './network/player-connection'
 import { RemoteInfo } from 'dgram'
 import { ResourceManager } from './resources/resource-manager'
-import { World } from './world/world'
 import { resolve } from 'path'
+import { GeneratorManager } from './world/generator/generator-manager'
+import { EventEmitter } from 'events'
+import { World } from './world/world'
 
-export class Jukebox {
+export class Jukebox extends EventEmitter {
   private static instance: Jukebox
   private server: RakServer
   private config: Required<Config>
   private connections: Map<RemoteInfo, PlayerConnection> = new Map()
   private encryption: Encryption | null = null
-  private defaultWorld = new World()
+  private playerList: Array<EntityPlayer> = []
+  private world: World
   private running = true
 
   public constructor(config: Required<Config>) {
-    this.config = config
+    super()
     if (Jukebox.instance) {
       Jukebox.getLogger().fatal(
         'Attempted to start the server twice on a single node process.'
       )
     }
+
+    this.config = config
 
     Jukebox.instance = this
     this.start()
@@ -36,7 +41,7 @@ export class Jukebox {
 
   private start(): void {
     Jukebox.getLogger().info(
-      'Starting Jukebox server for Minecraft bedrock edition...'
+      'Bootstrapping Jukebox server for Minecraft bedrock edition...'
     )
 
     this.server = new RakServer(
@@ -49,6 +54,13 @@ export class Jukebox {
     PacketRegistry.init()
     ResourceManager.init()
     BlockManager.init()
+    GeneratorManager.init()
+
+    // TODO: cleanup this mess
+    this.world = new World(
+      Jukebox.getConfig().defaultWorld ?? 'world',
+      GeneratorManager.getGenerator('flat')
+    )
 
     // Init encryption
     if (Jukebox.getConfig().encryption != false) {
@@ -77,10 +89,8 @@ export class Jukebox {
     // Main server tick (every 1/20 seconds)
     const tick = setInterval(() => {
       this.running == false && clearInterval(tick)
-      for (const conn of this.connections.values()) {
-        // Timestamp in nanoseconds for debug purposes
-        conn.process(process.hrtime()[1])
-      }
+      // TODO: tick worlds that will tick entities and players
+      this.emit('tick', process.hrtime()[1])
     }, 50)
   }
 
@@ -108,6 +118,18 @@ export class Jukebox {
     return Array.from(this.connections.values())
       .filter(conn => conn.isInitialized())
       .map(conn => conn.getPlayerInstance())
+  }
+
+  public getOnlinePlayer(username: string): EntityPlayer | null {
+    return (
+      this.getOnlinePlayers().find(
+        player => player.getUsername() === username
+      ) ?? null
+    )
+  }
+
+  public getPlayerList(): Array<EntityPlayer> {
+    return this.playerList
   }
 
   public shutdown(): void {
@@ -142,8 +164,8 @@ export class Jukebox {
     return Jukebox.instance.encryption
   }
 
-  public static getDefaultWorld(): World {
-    return Jukebox.instance.defaultWorld
+  public static getWorld(): World {
+    return Jukebox.instance.world
   }
 }
 

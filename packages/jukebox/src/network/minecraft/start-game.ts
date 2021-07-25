@@ -74,6 +74,7 @@ export class McpeStartGame extends DataPacket {
   public itemPalette: Array<any>
   public multiplayerCorrelationId: string
   public serverAuthoritativeInventory: boolean
+  public softwareVersion: string
 
   public constructor() {
     super(Protocol.START_GAME)
@@ -164,6 +165,7 @@ export class McpeStartGame extends DataPacket {
 
     McpeUtil.writeString(stream, this.multiplayerCorrelationId)
     stream.writeBoolean(this.serverAuthoritativeInventory)
+    McpeUtil.writeString(stream, this.softwareVersion)
   }
 
   public decode(): void {

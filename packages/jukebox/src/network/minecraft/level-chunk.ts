@@ -29,7 +29,12 @@ export class McpeLevelChunk extends DataPacket {
     stream.write(this.data)
   }
 
-  public decode(): void {
-    throw new Error('Unsupported operation')
+  public decode(stream: BinaryStream): void {
+    this.chunkX = stream.readVarInt()
+    this.chunkZ = stream.readVarInt()
+    this.subChunkCount = stream.readUnsignedVarInt()
+    this.cacheEnabled = stream.readBoolean()
+    // TODO: cache
+    this.data = stream.read(stream.readUnsignedVarInt())
   }
 }

@@ -9,6 +9,20 @@ export class Vector3 {
     this.z = z
   }
 
+  public toFloor(): Vector3 {
+    this.x = Math.floor(this.x)
+    this.y = Math.floor(this.y)
+    this.z = Math.floor(this.z)
+    return this
+  }
+
+  public add(x: number, y: number, z: number): Vector3 {
+    this.x += x
+    this.y += y
+    this.z += z
+    return this
+  }
+
   public getX(): number {
     return this.x
   }

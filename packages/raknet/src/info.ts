@@ -8,4 +8,5 @@ export const Info = {
   IPV4: 4,
   IPV6: 6,
   AF_INET6: 10,
+  RAKNET_TICK_TIME: 50,
 }

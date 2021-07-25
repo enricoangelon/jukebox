@@ -7,7 +7,7 @@ export class Chunk {
   private static readonly MAX_SLICES = 16
   private static readonly BIOMES_SIZE = 256
 
-  private readonly biomes = Buffer.alloc(Chunk.BIOMES_SIZE)
+  private readonly biomes = Buffer.alloc(Chunk.BIOMES_SIZE).fill(0)
   private readonly slices: Map<number, ChunkSlice> = new Map()
 
   private x: number
@@ -16,7 +16,6 @@ export class Chunk {
   public constructor(x: number, z: number) {
     this.x = x
     this.z = z
-    this.biomes.fill(0)
   }
 
   public getX(): number {
@@ -42,9 +41,10 @@ export class Chunk {
     for (let ci = 0; ci < topEmpty; ci++) {
       this.getSlice(ci).streamEncode(stream)
     }
-    stream.writeUnsignedVarInt(this.biomes.byteLength)
+
     stream.write(this.biomes)
-    stream.writeByte(0)
+    stream.writeByte(0) // border blocks size
+    stream.writeUnsignedVarInt(0) // extra data
 
     const levelChunk = new McpeLevelChunk()
     levelChunk.cacheEnabled = false
@@ -60,7 +60,7 @@ export class Chunk {
 
   public getTopEmpty(): number {
     let topEmpty = Chunk.MAX_SLICES
-    for (let ci = 15; ci >= 0; ci--) {
+    for (let ci = 0; ci <= Chunk.MAX_SLICES; ci++) {
       if (!this.slices.has(ci)) {
         topEmpty = ci
       } else {

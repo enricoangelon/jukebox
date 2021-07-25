@@ -10,10 +10,6 @@ export abstract class Packet {
   }
 
   protected encodeHeader(stream: BinaryStream): void {
-    assert(
-      this.encoded == false,
-      'Cannot encode multiple times the same packet'
-    )
     stream.writeByte(this.getId())
   }
 
@@ -23,6 +19,7 @@ export abstract class Packet {
     this.encodeHeader(stream)
     this.encode(stream)
     this.encoded = true
+
     return stream.getBuffer()
   }
 
@@ -36,6 +33,10 @@ export abstract class Packet {
   public internalDecode(stream: BinaryStream): void {
     this.decodeHeader(stream)
     this.decode(stream)
+  }
+
+  private clean(stream: BinaryStream): void {
+    stream = new BinaryStream()
   }
 
   public getId(): number {

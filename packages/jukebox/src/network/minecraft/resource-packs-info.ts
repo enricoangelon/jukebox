@@ -8,6 +8,7 @@ import { McpeUtil } from '../mcpe-util'
 export class McpeResourcePacksInfo extends DataPacket {
   public mustAccept: boolean
   public hasScripts: boolean
+  public forceAccept: boolean
   public behaviorPacks: Array<BehaviorPackInfo>
   public resourcePacks: Array<ResourcePackInfo>
 
@@ -18,6 +19,7 @@ export class McpeResourcePacksInfo extends DataPacket {
   public encode(stream: BinaryStream): void {
     stream.writeBoolean(this.mustAccept)
     stream.writeBoolean(this.hasScripts)
+    stream.writeBoolean(this.forceAccept)
     stream.writeUnsignedShortLE(this.behaviorPacks.length)
     for (const behaviorPack of this.behaviorPacks) {
       McpeUtil.writeBehaviorPackInfo(stream, behaviorPack)

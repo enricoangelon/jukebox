@@ -3,10 +3,13 @@ import { BinaryStream } from '@jukebox/binarystream'
 import { ResourcePackInfo } from '../resourcepack/resource-pack-info'
 import { ResourcePackStack } from '../resourcepack/resource-pack-stack'
 import { Vector3 } from '../math/vector3'
+import { UUID } from '../utils/uuid'
+import { Skin } from '../utils/skin/skin'
+import { SkinImage } from '../utils/skin/image'
 
 export class McpeUtil {
   public static readString(stream: BinaryStream): string {
-    const length = stream.readUnsignedInt()
+    const length = stream.readUnsignedVarInt()
     return stream.read(length).toString('utf-8')
   }
 
@@ -139,4 +142,75 @@ export class McpeUtil {
     McpeUtil.writeString(stream, stack.version)
     McpeUtil.writeString(stream, stack.subPackName)
   }
+
+  public static writeUUID(stream: BinaryStream, uuid: UUID): void {
+    stream.writeIntLE(uuid.getParts()[1])
+    stream.writeIntLE(uuid.getParts()[0])
+    stream.writeIntLE(uuid.getParts()[3])
+    stream.writeIntLE(uuid.getParts()[2])
+  }
+
+  public static readUUID(stream: BinaryStream): UUID {
+    const part1 = stream.readIntLE()
+    const part0 = stream.readIntLE()
+    const part3 = stream.readIntLE()
+    const part2 = stream.readIntLE()
+    return new UUID(part0, part1, part2, part3)
+  }
+
+  public static writeSkinImage(stream: BinaryStream, image: SkinImage): void {
+    stream.writeFloatLE(image.getWidth())
+    stream.writeFloatLE(image.getHeight())
+    stream.writeUnsignedVarInt(image.getData().byteLength)
+    stream.write(image.getData())
+  }
+
+  // TODO: readSkinImage
+
+  public static writeSkin(stream: BinaryStream, skin: Skin): void {
+    McpeUtil.writeString(stream, skin.getIdentifier())
+    McpeUtil.writeString(stream, skin.getPlayFabId())
+    McpeUtil.writeString(stream, skin.getResourcePatch())
+    McpeUtil.writeSkinImage(stream, skin.getImage())
+    stream.writeIntLE(skin.getAnimations().length)
+    for (const animation of skin.getAnimations()) {
+      McpeUtil.writeSkinImage(stream, animation.getImage())
+      stream.writeIntLE(animation.getType())
+      stream.writeFloatLE(animation.getFrames())
+      stream.writeIntLE(animation.getExpression())
+    }
+    McpeUtil.writeSkinImage(stream, skin.getCape().getImage())
+    McpeUtil.writeString(stream, skin.getGeometry())
+    McpeUtil.writeString(stream, skin.getAnimationData())
+    stream.writeBoolean(skin.isPremium())
+    stream.writeBoolean(skin.isPersona())
+    stream.writeBoolean(skin.isCapeOnClassicSkin())
+    McpeUtil.writeString(stream, skin.getCape().getIndetifier())
+    McpeUtil.writeString(stream, skin.getFullId())
+    McpeUtil.writeString(stream, skin.getArmSize())
+    McpeUtil.writeString(stream, skin.getColor())
+    if (skin.isPersona()) {
+      stream.writeIntLE(skin.getPersonaData().getPieces().length)
+      for (const personaPiece of skin.getPersonaData().getPieces()) {
+        McpeUtil.writeString(stream, personaPiece.pieceId)
+        McpeUtil.writeString(stream, personaPiece.pieceType)
+        McpeUtil.writeString(stream, personaPiece.packId)
+        stream.writeBoolean(personaPiece.default)
+        McpeUtil.writeString(stream, personaPiece.productId)
+      }
+      stream.writeIntLE(skin.getPersonaData().getTintColors().length)
+      for (const tint of skin.getPersonaData().getTintColors()) {
+        McpeUtil.writeString(stream, tint.pieceType)
+        stream.writeIntLE(tint.colors.length)
+        for (const color of tint.colors) {
+          McpeUtil.writeString(stream, color)
+        }
+      }
+    } else {
+      stream.writeIntLE(0)
+      stream.writeIntLE(0)
+    }
+  }
+
+  // TODO: readSkin
 }

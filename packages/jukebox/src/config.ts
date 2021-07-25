@@ -6,6 +6,7 @@ export interface Config {
   logger?: Logger
   server?: ServerConfig
   worlds?: WorldGenerator[]
+  defaultWorld: string
   lang?: string
   encryption?: boolean
 }

@@ -35,8 +35,6 @@ export class ResourceManager {
     this.cachedBiomesNBT = this.computeBiomesNBT()
   }
 
-  // TODO: remake as legacyIds are not supported anymore, instead
-  // better to use namespaces with their default state
   public static computeBlockStates(): Set<BlockStateContainer> {
     const vanillaBlocksFile = readFileSync(
       join(this.resourcesPath, 'blockstates', 'canonical_block_states.nbt')
@@ -49,9 +47,9 @@ export class ResourceManager {
     reader.setUseVarints(true)
 
     // Needs to be increased for every state
+    // Every state represents something like a block id + meta
     let runtimeId = 0
-    // Holds how many times we find the same block
-    // The meta will refer to the unique block with its unique states
+
     const metaCounter: Map<string, number> = new Map()
     do {
       const vanillaBlock = reader.parse()
@@ -68,28 +66,28 @@ export class ResourceManager {
         Jukebox.getLogger().debug(
           `Legacy id mapping not found for block=${vanillaBlockName}`
         )
-        continue
       }
+
+      const stateContainer = <BlockStateContainer>{}
+      stateContainer.name = vanillaBlockName
 
       const vanillaBlockStates = vanillaBlock.getCompound('states', false)
       if (vanillaBlockStates == null) {
         throw new Error(`Vanilla block=${vanillaBlockName} has no states`)
       }
 
-      const stateContainer = <BlockStateContainer>{}
-      stateContainer.name = vanillaBlockName
-      stateContainer.legacyId = (legacyIds as any)[vanillaBlockName]
-
       const blockStates: Set<BlockState> = new Set()
       for (const [name, tag] of vanillaBlockStates.entries()) {
         blockStates.add(<BlockState>{ name, nbt: tag })
       }
       stateContainer.states = blockStates
-
       stateContainer.runtimeId = runtimeId++
-      const meta = metaCounter.get(vanillaBlockName)!
 
+      // Legacy Ids compatibility for anvil
+      const meta = metaCounter.get(vanillaBlockName)!
       stateContainer.meta = meta
+      stateContainer.legacyId = (legacyIds as any)[vanillaBlockName] ?? -1
+
       states.add(stateContainer)
     } while (!stream.feof())
 

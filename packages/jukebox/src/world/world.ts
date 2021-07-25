@@ -1,17 +1,30 @@
-import { BlockManager } from '../block/block-manager'
 import { Chunk } from './chunk/chunk'
+import { CoordinateUtils } from './coordinate-utils'
+import { WorldGenerator } from './generator/generator'
 
+// Provider is by default leveldb as bedrock edition definition
 export class World {
-  public async generateFlatChunkAsync(cx: number, cz: number): Promise<Chunk> {
-    return new Promise(resolve => {
-      const chunk = new Chunk(cx, cz)
-      const grassRid = BlockManager.getRuntimeId(2, 0)
-      for (let x = 0; x < 16; x++) {
-        for (let z = 0; z < 16; z++) {
-          chunk.setRuntimeId(x, 2, z, grassRid)
-        }
-      }
-      resolve(chunk)
-    })
+  private name: string
+  private generator: WorldGenerator
+  public chunks: Map<string, Chunk> = new Map()
+
+  public constructor(name: string, generator: WorldGenerator) {
+    this.name = name
+    this.generator = generator
+  }
+
+  public tick(timestamp: number): void {}
+
+  public async getChunk(cx: number, cz: number, create = true): Promise<Chunk> {
+    const hash = CoordinateUtils.chunkHash(cx, cz)
+    if (!this.chunks.has(hash)) {
+      const chunk = await this.generator.generateChunkAsync(cx, cz)
+      this.chunks.set(hash, chunk)
+    }
+    return this.chunks.get(hash)!
+  }
+
+  public getFolderName(): string {
+    return this.name
   }
 }

@@ -4,7 +4,6 @@ import { Endianess } from './endianess'
 import { NBTDefinitions } from './definitions'
 import { NBTStreamReader } from './stream-reader'
 import { NBTTagCompound } from './tag-compound'
-import { readFileSync } from 'fs'
 
 export class NBTReader extends NBTStreamReader {
   public constructor(input: BinaryStream, endianess: Endianess) {

@@ -23,24 +23,18 @@ import { OpenConnectionRequestTwo } from './protocol/connection/open-connection-
 import { Packet } from './packet'
 import { RakServer } from './server'
 import { RemoteInfo } from 'dgram'
-import { assert } from 'console'
-
-export interface SessionMetrics {
-  retransmitted: number
-  efficency: number
-  networkLoss: number
-}
+import { assert, time } from 'console'
 
 export class NetworkSession {
   private readonly socket: RakServer
   private readonly rinfo: RemoteInfo
   private readonly logger: Logger
 
-  private guid: bigint | null
   // MaximumTransferUnit used to indetify
   // maximum buffer length we can send per packet
   private mtu: number
 
+  // TODO: implement client timeout
   private receiveTimestamp: number
 
   // Holds the received sequence numbers
@@ -61,36 +55,22 @@ export class NetworkSession {
   // Input ordering queue
   private inputOrderIndex: Map<number, number> = new Map()
   private inputOrderingQueue: Map<number, Map<number, Frame>> = new Map()
-  private highestOrderIndex: Map<number, number> = new Map()
+  private highestSequenceIndex: Map<number, number> = new Map()
   // Used to identify split packets
   private fragmentID = 0
-
-  // Used to calculate network efficency and packet loss
-  private metrics: SessionMetrics = {
-    retransmitted: 0,
-    efficency: 100,
-    networkLoss: 0,
-  }
 
   // fragmentID -> FragmentedFrame ( index -> buffer )
   private fragmentedFrames: Map<number, Map<number, Frame>> = new Map()
 
   public constructor(socket: RakServer, rinfo: RemoteInfo, logger: Logger) {
-    this.guid = null
     this.logger = logger
     this.socket = socket
     this.rinfo = rinfo
+
+    this.socket.on(NetEvents.TICK, this.tick.bind(this))
   }
 
   public tick(timestamp: number): void {
-    // Calculate metrics: https://manuals.gfi.com/en/exinda/help/content/exos/how-stuff-works/packet-loss.htm
-    // Efficency formula (percentage): 100 * (transferred - retransmitted) / transferred
-    this.metrics.efficency =
-      (100 * (this.outputSequenceNumber - this.metrics.retransmitted)) /
-      this.outputSequenceNumber
-    // Network loss formula: 100 - efficency
-    this.metrics.networkLoss = 100 - this.metrics.efficency
-
     // Acknowledge recived packets to the other end
     if (this.inputSequenceNumbers.size > 0) {
       const records: Set<Record> = new Set()
@@ -161,8 +141,8 @@ export class NetworkSession {
     }
   }
 
-  public async handle(stream: BinaryStream, rinfo: RemoteInfo): Promise<void> {
-    if (!(await this.handleDatagram(stream, rinfo))) {
+  public async handle(stream: BinaryStream): Promise<void> {
+    if (!(await this.handleDatagram(stream))) {
       const packetId = stream.getBuffer().readUInt8(0)
       if (packetId & FrameFlags.ACK) {
         this.handleAcknowledgement(stream)
@@ -175,10 +155,7 @@ export class NetworkSession {
     }
   }
 
-  private async handleDatagram(
-    stream: BinaryStream,
-    rinfo: RemoteInfo
-  ): Promise<boolean> {
+  private async handleDatagram(stream: BinaryStream): Promise<boolean> {
     // Used to timout the client if we don't receive new packets
     this.receiveTimestamp = Date.now()
 
@@ -247,16 +224,26 @@ export class NetworkSession {
     }
 
     if (frame.isSequenced()) {
-      if (this.highestOrderIndex.has(frame.orderChannel)) {
-        const highestOrderIndex = this.highestOrderIndex.get(
+      if (this.highestSequenceIndex.has(frame.orderChannel)) {
+        const highestSequenceIndex = this.highestSequenceIndex.get(
           frame.orderChannel
         )!
-        if (frame.sequenceIndex < highestOrderIndex) {
+        const inputOrderIndex =
+          this.inputOrderIndex.get(frame.orderChannel) ?? 0
+        if (
+          frame.sequenceIndex < highestSequenceIndex ||
+          frame.orderedIndex < inputOrderIndex
+        ) {
           // packet is too old
           return
         }
+
+        this.highestSequenceIndex.set(
+          frame.orderChannel,
+          frame.sequenceIndex + 1
+        )
       } else {
-        this.highestOrderIndex.set(frame.orderChannel, frame.orderedIndex)
+        this.highestSequenceIndex.set(frame.orderChannel, frame.orderedIndex)
       }
 
       this.handleFrame(frame)
@@ -269,7 +256,7 @@ export class NetworkSession {
       // Check if it's the next expected packet
       const expectedOrderIndex = this.inputOrderIndex.get(frame.orderChannel)!
       if (frame.orderedIndex == expectedOrderIndex) {
-        this.highestOrderIndex.set(frame.orderedIndex, 0)
+        this.highestSequenceIndex.set(frame.orderedIndex, 0)
         // Update the next expected index
         const nextExpectedOrderIndex = expectedOrderIndex + 1
         this.inputOrderIndex.set(frame.orderChannel, nextExpectedOrderIndex)
@@ -315,9 +302,6 @@ export class NetworkSession {
         const connectionRequest = new ConnectionRequest()
         connectionRequest.internalDecode(stream)
 
-        // TODO: GUID implementation
-        this.guid = connectionRequest.clientGUID
-
         const connectionRequestAccepted = new ConnectionRequestAccepted()
         connectionRequestAccepted.clientAddress = this.rinfo
         connectionRequestAccepted.clientTimestamp = connectionRequest.timestamp
@@ -348,9 +332,7 @@ export class NetworkSession {
     const fragmentID = frame.fragmentID
     const fragmentIndex = frame.fragmentIndex
     if (!this.fragmentedFrames.has(fragmentID)) {
-      const fragments = new Map()
-      fragments.set(fragmentIndex, frame)
-      this.fragmentedFrames.set(fragmentID, fragments)
+      this.fragmentedFrames.set(fragmentID, new Map([[fragmentIndex, frame]]))
     } else {
       const fragments = this.fragmentedFrames.get(fragmentID)!
       fragments.set(fragmentIndex, frame)
@@ -449,14 +431,21 @@ export class NetworkSession {
 
     for (const [index, buffer] of buffers) {
       const newFrame = new Frame()
-      newFrame.fragmentID = this.fragmentID++
+      newFrame.fragmentID = this.fragmentID
       newFrame.fragmentSize = buffers.size
       newFrame.fragmentIndex = index
       newFrame.reliability = frame.reliability
       newFrame.content = buffer
 
       if (newFrame.isReliable()) {
-        newFrame.reliableIndex = this.outputReliableIndex++
+        // By logic we already increased by one the index before splitting
+        // and after splitting we are increasing again skipping a reliable index
+        // this hack will reuse the prevous index in order to avoid skipping
+        if (index == 0) {
+          newFrame.reliableIndex = frame.reliableIndex
+        } else {
+          newFrame.reliableIndex = this.outputReliableIndex++
+        }
         if (newFrame.isOrdered()) {
           newFrame.orderChannel = frame.orderChannel
           newFrame.orderedIndex = frame.orderedIndex
@@ -465,6 +454,9 @@ export class NetworkSession {
 
       fragments.push(newFrame)
     }
+
+    // Increase the splitID for the next split packet
+    this.fragmentID++
 
     return fragments
   }
@@ -487,10 +479,10 @@ export class NetworkSession {
     const filledFrame = this.getFilledFrame(frame)
 
     if (filledFrame.getByteSize() > this.mtu) {
-      this.fragmentFrame(frame).forEach(frame => {
+      this.fragmentFrame(frame).forEach(fragment => {
         const frameSet = new FrameSetPacket()
         frameSet.sequenceNumber = this.outputSequenceNumber++
-        frameSet.frames.push(frame)
+        frameSet.frames.push(fragment)
         this.sendFrameSet(frameSet)
       })
     } else {
@@ -502,7 +494,6 @@ export class NetworkSession {
   }
 
   private sendLostFrameSet(sequenceNumber: number): void {
-    this.metrics.retransmitted += 1
     if (this.outputFrameSets.has(sequenceNumber)) {
       const packet = this.outputFrameSets.get(sequenceNumber)!
       this.outputFrameSets.delete(sequenceNumber)
@@ -569,11 +560,6 @@ export class NetworkSession {
   private async handleOpenConnectionRequestOne(
     stream: BinaryStream
   ): Promise<void> {
-    // TODO: client GUID handling
-    // if (this.socket.hasClientGuid(this.getGuid())) {
-    //  this.sendAlreadyConnected()
-    //  return
-    // }
     const openConnectionRequestOne = new OpenConnectionRequestOne()
     openConnectionRequestOne.internalDecode(stream)
 
@@ -606,14 +592,6 @@ export class NetworkSession {
     this.logger.debug(
       `Maximum Transfer Unit agreed to be: ${this.mtu} with ${this.rinfo.address}:${this.rinfo.port}`
     )
-
-    // TODO: guid
-    // if (this.socket.hasClientGuid(this.getGuid())) {
-    //  this.sendAlreadyConnected()
-    //  return
-    // }
-
-    // this.socket.addGuidSession(this)
     this.sendPacket(openConnectionReplyTwo)
   }
 
@@ -629,9 +607,5 @@ export class NetworkSession {
 
   public getRemoteInfo(): RemoteInfo {
     return this.rinfo
-  }
-
-  public getGuid(): bigint {
-    return this.guid!
   }
 }

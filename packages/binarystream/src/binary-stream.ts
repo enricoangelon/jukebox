@@ -150,7 +150,7 @@ export class BinaryStream {
 
   public writeFloat(v: number): void {
     const buf = Buffer.alloc(4)
-    buf.writeFloatBE(0)
+    buf.writeFloatBE(v)
     this.write(buf)
   }
 
@@ -270,7 +270,7 @@ export class BinaryStream {
       if (this.feof()) {
         throw new Error('No bytes left in buffer')
       }
-      let b = this.readByte()
+      const b = this.readByte()
       value |= (b & 0x7f) << i
 
       if ((b & 0x80) === 0) {

@@ -1,8 +1,14 @@
+import { BlockStateContainer } from './internal/block-state-container'
 import { ResourceManager } from '../resources/resource-manager'
-import { inspect } from 'util'
+import assert from 'assert'
 
 export class BlockManager {
   private static legacyToRuntimeId: Map<number, number> = new Map()
+  private static runtimeToLegacyId: Map<number, number> = new Map()
+  private static blockStateMappings: Map<
+    string,
+    BlockStateContainer
+  > = new Map()
 
   public static init(): void {
     this.generateMappings()
@@ -11,19 +17,38 @@ export class BlockManager {
   private static generateMappings(): void {
     const blockStates = ResourceManager.computeBlockStates()
     for (const stateContainer of blockStates) {
-      if (stateContainer.meta > 15) continue // No one knows why we have meta bigger than 15
-      if (stateContainer.name == 'minecraft:stone') {
-        // console.log(inspect(stateContainer, { depth: null, showHidden: true }))
-      }
+      this.blockStateMappings.set(stateContainer.name, stateContainer)
       this.legacyToRuntimeId.set(
         (stateContainer.legacyId << 4) | stateContainer.meta,
         stateContainer.runtimeId
       )
+      this.runtimeToLegacyId.set(
+        stateContainer.runtimeId,
+        (stateContainer.legacyId << 4) | stateContainer.meta
+      )
     }
   }
 
-  // TODO: legacyIds & metadata are no longer used, convert to namespaces...
-  public static getRuntimeId(legacyId: number, meta: number): number {
-    return this.legacyToRuntimeId.get((legacyId << 4) | meta)!
+  // TODO: find a way to get the right state
+  public static getRuntimeId(blockName: string): number {
+    assert(
+      blockName.startsWith('minecraft:'),
+      'Block name must start with "minecraft:"!'
+    )
+    if (!this.blockStateMappings.has(blockName)) {
+      const state = this.blockStateMappings.get('minecraft:air')
+      // Air can't be missing!!
+      assert(state != null, 'Bad block state mappings!')
+      return state.runtimeId
+    }
+    const state = this.blockStateMappings.get(blockName)!
+    return state.runtimeId
+  }
+
+  public static getRuntimeByLegacyId(legacyId: number, meta: number): number {
+    return (
+      this.legacyToRuntimeId.get((legacyId << 4) | meta) ??
+      this.getRuntimeId('minecraft:air')
+    )
   }
 }
