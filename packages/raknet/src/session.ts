@@ -405,12 +405,13 @@ export class NetworkSession {
     if (frame.isReliable()) {
       frame.reliableIndex = this.outputReliableIndex++
       if (frame.isOrdered()) {
-        if (!this.orderingIndexes.has(frame.orderChannel)) {
-          this.orderingIndexes.set(frame.orderChannel, 0)
+        const orderChannel = frame.orderChannel ?? 0
+        if (!this.orderingIndexes.has(orderChannel)) {
+          this.orderingIndexes.set(orderChannel, 0) // TODO: may result undefined
           frame.orderedIndex = 0
         } else {
-          const orderIndex = this.orderingIndexes.get(frame.orderChannel)!
-          this.orderingIndexes.set(frame.orderChannel, orderIndex + 1)
+          const orderIndex = this.orderingIndexes.get(orderChannel)!
+          this.orderingIndexes.set(orderChannel, orderIndex + 1)
           frame.orderedIndex = orderIndex + 1
         }
       }

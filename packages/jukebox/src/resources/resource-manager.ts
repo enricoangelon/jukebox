@@ -13,8 +13,6 @@ import { NBTTag } from '../../../nbt/lib/tag'
 import { BinaryStream } from '@jukebox/binarystream'
 import { BlockStateContainer } from '../block/internal/block-state-container'
 import { BlockState } from '../block/internal/block-state'
-import legacyIds from './blockstates/block_id_map.json'
-import { Jukebox } from '../jukebox'
 
 interface BiomeFileFormat {
   format_version: string
