@@ -1,21 +1,22 @@
-import { BinaryStream } from '@jukebox/binarystream'
 import assert from 'assert'
+
+import { WriteStream, BinaryStream } from '@jukebox/binarystream'
 
 export abstract class Packet {
   private readonly id: number
-  private encoded = false
+  protected encoded = false
 
   public constructor(id: number) {
     this.id = id
   }
 
-  protected encodeHeader(stream: BinaryStream): void {
+  protected encodeHeader(stream: WriteStream): void {
     stream.writeByte(this.getId())
   }
 
-  abstract encode(stream: BinaryStream): void
+  abstract encode(stream: WriteStream): void
 
-  public internalEncode(stream = new BinaryStream()): Buffer {
+  public internalEncode(stream: WriteStream): Buffer {
     this.encodeHeader(stream)
     this.encode(stream)
     this.encoded = true
@@ -33,10 +34,6 @@ export abstract class Packet {
   public internalDecode(stream: BinaryStream): void {
     this.decodeHeader(stream)
     this.decode(stream)
-  }
-
-  private clean(stream: BinaryStream): void {
-    stream = new BinaryStream()
   }
 
   public getId(): number {

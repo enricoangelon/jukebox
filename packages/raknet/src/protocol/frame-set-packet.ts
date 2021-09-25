@@ -1,8 +1,10 @@
-import { BinaryStream } from '@jukebox/binarystream'
+import assert from 'assert'
+
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+
+import { Packet } from '../packet'
 import { Frame } from './frame'
 import { FrameFlags } from './frame-flags'
-import { Packet } from '../packet'
-import assert from 'assert'
 
 // Represents the DatagramPacket
 export class FrameSetPacket extends Packet {
@@ -14,7 +16,7 @@ export class FrameSetPacket extends Packet {
     super(FrameFlags.VALID)
   }
 
-  public encode(stream: BinaryStream): void {
+  public encode(stream: WriteStream): void {
     stream.writeTriadLE(this.sequenceNumber)
     for (const frame of this.frames) {
       frame.streamEncode(stream)

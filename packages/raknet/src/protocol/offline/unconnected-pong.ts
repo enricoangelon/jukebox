@@ -1,4 +1,5 @@
-import { BinaryStream } from '@jukebox/binarystream'
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+
 import { Identifiers } from '../../identifiers'
 import { NetUtils } from '../../net-utils'
 import { Packet } from '../../packet'
@@ -15,7 +16,7 @@ export class UnconnectedPong extends Packet {
     super(Identifiers.UNCONNECTED_PONG)
   }
 
-  public encode(stream: BinaryStream): void {
+  public encode(stream: WriteStream): void {
     stream.writeLong(this.timestamp)
     stream.writeLong(this.serverGUID)
     NetUtils.writeMagic(stream)

@@ -1,6 +1,7 @@
+import assert from 'assert'
+
 import { McpeLogin } from './minecraft/login'
 import { Protocol } from './protocol'
-import assert from 'assert'
 
 // TODO: fix typings
 export class PacketRegistry {

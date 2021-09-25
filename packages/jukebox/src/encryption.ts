@@ -1,4 +1,4 @@
-import { KeyObject, diffieHellman, generateKeyPairSync } from 'crypto'
+import { diffieHellman, generateKeyPairSync, KeyObject } from 'crypto'
 
 export class Encryption {
   public static readonly CURVE = 'secp384r1'

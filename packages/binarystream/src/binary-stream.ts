@@ -39,9 +39,10 @@ export class BinaryStream {
     return this.buffer.slice(this.offset, (this.offset += len))
   }
 
+  public write(arr: Uint8Array): void
   public write(buf: Buffer): void {
     this.buffer = Buffer.concat([this.buffer, buf])
-    this.offset += Buffer.byteLength(buf)
+    this.offset += buf.byteLength
   }
 
   public readInt(): number {
@@ -185,7 +186,7 @@ export class BinaryStream {
 
   public writeUnsignedInt(v: number): void {
     const buf = Buffer.alloc(4)
-    buf.writeUInt32BE(v, 0)
+    buf.writeUInt32BE(v)
     this.write(buf)
   }
 

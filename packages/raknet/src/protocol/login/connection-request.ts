@@ -1,4 +1,5 @@
-import { BinaryStream } from '@jukebox/binarystream'
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+
 import { Identifiers } from '../../identifiers'
 import { Packet } from '../../packet'
 
@@ -10,7 +11,7 @@ export class ConnectionRequest extends Packet {
     super(Identifiers.CONNECTION_REQUEST)
   }
 
-  public encode(stream: BinaryStream): void {
+  public encode(stream: WriteStream): void {
     stream.writeLong(this.clientGUID)
     stream.writeLong(this.timestamp)
   }

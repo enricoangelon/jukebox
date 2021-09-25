@@ -7,6 +7,7 @@ export class World {
   private name: string
   private generator: WorldGenerator
   public chunks: Map<string, Chunk> = new Map()
+  // public chunkRequestBatch: Map
 
   public constructor(name: string, generator: WorldGenerator) {
     this.name = name

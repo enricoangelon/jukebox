@@ -1,18 +1,23 @@
-import { NetEvents, NetworkSession, RakServer } from '@jukebox/raknet'
+import assert from 'assert'
+import { RemoteInfo } from 'dgram'
+import { EventEmitter } from 'events'
+import { resolve } from 'path'
+import { TaskTimer } from 'tasktimer'
 
 import { BinaryStream } from '@jukebox/binarystream'
+import { Logger } from '@jukebox/logger'
+import { NetEvents, NetworkSession, RakServer } from '@jukebox/raknet'
+
 import { BlockManager } from './block/block-manager'
 import { Config } from './config'
 import { Encryption } from './encryption'
-import { EntityPlayer } from './entity/entity-player'
-import { Logger } from '@jukebox/logger'
+import { EntityPlayer } from './entity/player'
+import { DataPacket } from './network/minecraft/internal/data-packet'
+import { PlayerListEntry } from './network/minecraft/player-list'
 import { PacketRegistry } from './network/packet-registry'
 import { PlayerConnection } from './network/player-connection'
-import { RemoteInfo } from 'dgram'
 import { ResourceManager } from './resources/resource-manager'
-import { resolve } from 'path'
 import { GeneratorManager } from './world/generator/generator-manager'
-import { EventEmitter } from 'events'
 import { World } from './world/world'
 
 export class Jukebox extends EventEmitter {
@@ -21,9 +26,9 @@ export class Jukebox extends EventEmitter {
   private config: Required<Config>
   private connections: Map<RemoteInfo, PlayerConnection> = new Map()
   private encryption: Encryption | null = null
-  private playerList: Array<EntityPlayer> = []
+  private playerList: Array<PlayerListEntry> = []
   private world: World
-  private running = true
+  private ticker: TaskTimer
 
   public constructor(config: Required<Config>) {
     super()
@@ -43,6 +48,9 @@ export class Jukebox extends EventEmitter {
     Jukebox.getLogger().info(
       'Bootstrapping Jukebox server for Minecraft bedrock edition...'
     )
+
+    // Allow unlimited listeners
+    this.setMaxListeners(0)
 
     this.server = new RakServer(
       Jukebox.getConfig().server.port ?? 19132,
@@ -75,6 +83,9 @@ export class Jukebox extends EventEmitter {
     this.server.on(NetEvents.CLOSE_SESSION, (rinfo: RemoteInfo) => {
       // We already know that connection is close, so we're safe doing it
       if (this.connections.has(rinfo)) {
+        const connection = this.connections.get(rinfo)
+        assert(connection != null, `Connection not found with key ${rinfo}`)
+        connection.disconnect()
         this.connections.delete(rinfo)
       }
     })
@@ -87,11 +98,17 @@ export class Jukebox extends EventEmitter {
     }
 
     // Main server tick (every 1/20 seconds)
-    const tick = setInterval(() => {
-      this.running == false && clearInterval(tick)
-      // TODO: tick worlds that will tick entities and players
-      this.emit('tick', process.hrtime()[1])
-    }, 50)
+    this.ticker = new TaskTimer(50)
+    this.ticker
+      .add({
+        callback: () => {
+          // TODO: tick worlds that will tick entities and players
+          for (const onlinePlayer of this.getOnlinePlayers()) {
+            onlinePlayer.tick(0) // Just temp
+          }
+        },
+      })
+      .start()
   }
 
   /**
@@ -114,6 +131,17 @@ export class Jukebox extends EventEmitter {
     conn.handleWrapper(stream)
   }
 
+  public broadcastDataPacket<T extends DataPacket>(
+    packet: T,
+    immediate = false
+  ): void {
+    for (const player of this.getOnlinePlayers()) {
+      immediate
+        ? player.getConnection().sendImmediateDataPacket(packet)
+        : player.getConnection().sendQueuedDataPacket(packet)
+    }
+  }
+
   public getOnlinePlayers(): EntityPlayer[] {
     return Array.from(this.connections.values())
       .filter(conn => conn.isInitialized())
@@ -128,7 +156,7 @@ export class Jukebox extends EventEmitter {
     )
   }
 
-  public getPlayerList(): Array<EntityPlayer> {
+  public getPlayerList(): Array<PlayerListEntry> {
     return this.playerList
   }
 
@@ -136,7 +164,7 @@ export class Jukebox extends EventEmitter {
     // Close network provider
     this.server.close()
     // Stop ticking connections
-    this.running = false
+    this.ticker.stop()
     // Remove all connections
     this.connections.clear()
     Jukebox.getLogger().info('Successfully closed the server socket!')

@@ -1,7 +1,8 @@
-import { Allocation } from './allocation'
 import { BinaryStream } from '@jukebox/binarystream'
-import { Endianess } from './endianess'
+
+import { Allocation } from './allocation'
 import { NBTDefinitions } from './definitions'
+import { Endianess } from './endianess'
 import { NBTStreamReader } from './stream-reader'
 import { NBTTagCompound } from './tag-compound'
 

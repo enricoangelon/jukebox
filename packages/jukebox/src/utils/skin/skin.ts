@@ -1,4 +1,5 @@
 import assert from 'assert'
+
 import { PlayerLoginData } from '../../network/player-login-data'
 import { SkinAnimation } from './animation'
 import { SkinCape } from './cape'
@@ -124,7 +125,11 @@ export class Skin {
     return new Skin(
       loginData.SkinId,
       loginData.PlayFabId,
-      Buffer.from(loginData.SkinResourcePatch, 'base64').toString(),
+      JSON.stringify(
+        JSON.parse(
+          Buffer.from(loginData.SkinResourcePatch, 'base64').toString()
+        )
+      ),
       new SkinImage(
         loginData.SkinImageWidth,
         loginData.SkinImageHeight,
@@ -153,27 +158,31 @@ export class Skin {
           Buffer.from(loginData.CapeData, 'base64')
         )
       ),
-      Buffer.from(loginData.SkinGeometryData, 'base64').toString(),
+      JSON.stringify(
+        JSON.parse(Buffer.from(loginData.SkinGeometryData, 'base64').toString())
+      ),
       Buffer.from(loginData.SkinAnimationData, 'base64').toString(),
       loginData.PersonaSkin,
       loginData.PremiumSkin,
       loginData.CapeOnClassicSkin,
-      new SkinPersona(
-        loginData.PersonaPieces.map(
-          personaPiece =>
-            new SkinPersonaPiece(
-              personaPiece.IsDefault,
-              personaPiece.PackId,
-              personaPiece.PieceId,
-              personaPiece.PieceType,
-              personaPiece.ProductId
+      loginData.PersonaSkin
+        ? new SkinPersona(
+            loginData.PersonaPieces.map(
+              personaPiece =>
+                new SkinPersonaPiece(
+                  personaPiece.IsDefault,
+                  personaPiece.PackId,
+                  personaPiece.PieceId,
+                  personaPiece.PieceType,
+                  personaPiece.ProductId
+                )
+            ),
+            loginData.PieceTintColors.map(
+              tintColor =>
+                new SkinPersonaTintColors(tintColor.Colors, tintColor.PieceType)
             )
-        ),
-        loginData.PieceTintColors.map(
-          tintColor =>
-            new SkinPersonaTintColors(tintColor.Colors, tintColor.PieceType)
-        )
-      )
+          )
+        : null
     )
   }
 }

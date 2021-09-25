@@ -1,6 +1,7 @@
-import { BlockStateContainer } from './internal/block-state-container'
-import { ResourceManager } from '../resources/resource-manager'
 import assert from 'assert'
+
+import { ResourceManager } from '../resources/resource-manager'
+import { BlockStateContainer } from './internal/block-state-container'
 
 export class BlockManager {
   private static blockStateMappings: Map<

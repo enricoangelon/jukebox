@@ -1,6 +1,7 @@
 import { BinaryStream } from '@jukebox/binarystream'
-import { Endianess } from './endianess'
+
 import { NBTDefinitions } from './definitions'
+import { Endianess } from './endianess'
 import { NBTTag } from './tag'
 import { NBTTagCompound } from './tag-compound'
 
@@ -129,9 +130,7 @@ export class NBTWriter {
       | number[]
   >(value: Set<NBTTag<Type>>): void {
     if (value.size > 0) {
-      const listNbtType = (value.entries().next()
-        .value as NBTTag<Type>).getTagType()
-      console.log(listNbtType)
+      const listNbtType = value.values().next().value.getTagType()
       this.writeByteValue(listNbtType)
       this.writeIntegerValue(value.size)
       for (const rawValue of value) {

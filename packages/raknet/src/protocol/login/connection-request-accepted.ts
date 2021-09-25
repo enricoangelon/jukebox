@@ -1,8 +1,10 @@
-import { BinaryStream } from '@jukebox/binarystream'
+import { RemoteInfo } from 'dgram'
+
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+
 import { Identifiers } from '../../identifiers'
 import { NetUtils } from '../../net-utils'
 import { Packet } from '../../packet'
-import { RemoteInfo } from 'dgram'
 
 export class ConnectionRequestAccepted extends Packet {
   public clientAddress: RemoteInfo
@@ -13,7 +15,7 @@ export class ConnectionRequestAccepted extends Packet {
     super(Identifiers.CONNECTION_REQUEST_ACCEPTED)
   }
 
-  public encode(stream: BinaryStream): void {
+  public encode(stream: WriteStream): void {
     NetUtils.writeAddress(stream, this.clientAddress)
     stream.writeShort(0) // unknown
     for (let i = 0; i < 20; i++) {

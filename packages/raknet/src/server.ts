@@ -1,17 +1,19 @@
-import { DevLogger, Logger } from '@jukebox/logger'
-import { RemoteInfo, Socket, createSocket } from 'dgram'
-
-import { BinaryStream } from '@jukebox/binarystream'
+import { assert, time } from 'console'
+import { randomBytes } from 'crypto'
+import { createSocket, RemoteInfo, Socket } from 'dgram'
 import { EventEmitter } from 'events'
+import { TaskTimer } from 'tasktimer'
+
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+import { DevLogger, Logger } from '@jukebox/logger'
+
 import { Identifiers } from './identifiers'
+import { Info } from './info'
 import { NetEvents } from './net-events'
-import { NetworkSession } from './session'
 import { Packet } from './packet'
 import { UnconnectedPing } from './protocol/offline/unconnected-ping'
 import { UnconnectedPong } from './protocol/offline/unconnected-pong'
-import { assert } from 'console'
-import { randomBytes } from 'crypto'
-import { Info } from './info'
+import { NetworkSession } from './session'
 
 export class RakServer extends EventEmitter {
   private static socket: Socket
@@ -21,14 +23,12 @@ export class RakServer extends EventEmitter {
   private readonly guid: bigint
   private readonly logger: Logger
   private readonly port: number
-  private running = true
 
   public constructor(port: number, maxConnections: number, logger?: Logger) {
     super()
     this.port = port
     this.maxConnections = maxConnections
     this.logger = logger ?? new DevLogger()
-
     this.guid = randomBytes(8).readBigInt64BE()
   }
 
@@ -37,29 +37,36 @@ export class RakServer extends EventEmitter {
       throw err
     })
 
+    const timer = new TaskTimer(Info.RAKNET_TICK_TIME)
+    timer.add({
+      callback: () => {
+        for (const session of this.sessions.values()) {
+          session.tick()
+          // TODO: if session is disconnected
+        }
+      },
+    })
+
     RakServer.socket.bind(this.port, () => {
       this.emit(NetEvents.LISTENING, this.port)
-      // Sync handle all sessions
-      const tick = setInterval(() => {
-        if (!this.running) {
-          clearInterval(tick)
-        }
-
-        this.emit(NetEvents.TICK, Date.now())
-      }, Info.RAKNET_TICK_TIME)
+      timer.start()
     })
+
+    RakServer.socket.on('close', () => timer.stop())
 
     RakServer.socket.on('message', async (msg, rinfo) => {
       // The first byte identifies the packet
       const stream = new BinaryStream(msg)
 
-      if (!(await this.handleUnconnected(stream, rinfo))) {
-        const session = this.retriveSession(stream, rinfo)
-        if (session != null) {
-          await session.handle(stream)
-        } else {
-          return
+      try {
+        if (!(await this.handleUnconnected(stream, rinfo))) {
+          const session = this.retriveSession(stream, rinfo)
+          session != null && (await session.handle(stream))
         }
+      } catch (error) {
+        this.logger.error(
+          `Failed to handle a packet from ${rinfo.address}:${rinfo.port}: ${error}`
+        )
       }
     })
   }
@@ -100,7 +107,11 @@ export class RakServer extends EventEmitter {
     // this.emit('motd')
 
     unconnectedPong.data = motd
-    RakServer.sendPacket(unconnectedPong, rinfo)
+
+    // Buffer size: HEADER (1) + 8 + 8 + MAGIC (16) + 2 data length prefix + data length
+    const writeStream = new WriteStream(Buffer.allocUnsafe(35 + motd.length))
+    const encoded = unconnectedPong.internalEncode(writeStream)
+    RakServer.sendBuffer(encoded, rinfo)
   }
 
   private retriveSession(
@@ -117,7 +128,6 @@ export class RakServer extends EventEmitter {
         this.sessions.set(token, connection)
       }
     }
-
     return this.sessions.get(token) ?? null
   }
 
@@ -137,7 +147,6 @@ export class RakServer extends EventEmitter {
     this.getSocket().close()
     // TODO: finish to send last packets before closing listeners
     // TODO: close each session
-    this.running = false
     this.removeAllListeners()
   }
 
@@ -154,7 +163,8 @@ export class RakServer extends EventEmitter {
     rinfo: RemoteInfo
   ): void {
     assert(packet.isEncoded() == false, 'Cannot send a already encoded packet')
-    const buffer = packet.internalEncode()
+    const writeStream = new WriteStream(Buffer.allocUnsafe(4096))
+    const buffer = packet.internalEncode(writeStream)
     RakServer.sendBuffer(buffer, rinfo)
   }
 

@@ -1,14 +1,15 @@
-import { BinaryStream } from '@jukebox/binarystream'
-import { DataPacket } from './internal/data-packet'
-import { Protocol } from '../protocol'
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+
 import { ResourceManager } from '../../resources/resource-manager'
+import { Protocol } from '../protocol'
+import { DataPacket } from './internal/data-packet'
 
 export class McpeBiomeDefinitionList extends DataPacket {
   public constructor() {
     super(Protocol.BIOME_DEFINITION_LIST)
   }
 
-  public encode(stream: BinaryStream): void {
+  public encode(stream: WriteStream): void {
     stream.write(ResourceManager.getBiomesNBTBuffer())
   }
 

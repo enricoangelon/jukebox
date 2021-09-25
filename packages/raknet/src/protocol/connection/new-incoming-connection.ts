@@ -1,8 +1,10 @@
-import { BinaryStream } from '@jukebox/binarystream'
+import { RemoteInfo } from 'dgram'
+
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+
+import { Identifiers } from '../../identifiers'
 import { NetUtils } from '../../net-utils'
 import { Packet } from '../../packet'
-import { RemoteInfo } from 'dgram'
-import { Identifiers } from '../../identifiers'
 
 export class NewIncomingConnection extends Packet {
   public serverAddress: RemoteInfo
@@ -14,14 +16,14 @@ export class NewIncomingConnection extends Packet {
     super(Identifiers.NEW_INCOMING_CONNECTION)
   }
 
-  public encode(stream: BinaryStream): void {
+  public encode(stream: WriteStream): void {
     NetUtils.writeAddress(stream, this.serverAddress)
     for (let i = 0; i < 20; i++) {
-      NetUtils.writeAddress(stream, <RemoteInfo>{
+      NetUtils.writeAddress(stream, {
         address: '255.255.255.255',
         port: 19132,
         family: 'IPv4',
-      })
+      } as RemoteInfo)
     }
     stream.writeLong(this.clientTimestamp)
     stream.writeLong(this.timestamp)

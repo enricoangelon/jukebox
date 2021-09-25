@@ -1,9 +1,10 @@
-import { BinaryStream } from '@jukebox/binarystream'
-import { DataPacket } from './internal/data-packet'
-import { Protocol } from '../protocol'
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+
 import { BehaviorPackInfo } from '../../resourcepack/behavior-pack-info'
 import { ResourcePackInfo } from '../../resourcepack/resource-pack-info'
 import { McpeUtil } from '../mcpe-util'
+import { Protocol } from '../protocol'
+import { DataPacket } from './internal/data-packet'
 
 export class McpeResourcePacksInfo extends DataPacket {
   public mustAccept: boolean
@@ -16,7 +17,7 @@ export class McpeResourcePacksInfo extends DataPacket {
     super(Protocol.RESOURCE_PACKS_INFO)
   }
 
-  public encode(stream: BinaryStream): void {
+  public encode(stream: WriteStream): void {
     stream.writeBoolean(this.mustAccept)
     stream.writeBoolean(this.hasScripts)
     stream.writeBoolean(this.forceAccept)

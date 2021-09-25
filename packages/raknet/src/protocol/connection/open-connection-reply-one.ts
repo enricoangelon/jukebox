@@ -1,4 +1,5 @@
-import { BinaryStream } from '@jukebox/binarystream'
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+
 import { Identifiers } from '../../identifiers'
 import { NetUtils } from '../../net-utils'
 import { Packet } from '../../packet'
@@ -14,7 +15,7 @@ export class OpenConnectionReplyOne extends Packet {
     super(Identifiers.OPEN_CONNECTION_REPLY_1)
   }
 
-  public encode(stream: BinaryStream): void {
+  public encode(stream: WriteStream): void {
     NetUtils.writeMagic(stream)
     stream.writeLong(this.serverGuid)
     stream.writeBoolean(this.security)

@@ -1,13 +1,19 @@
-import { BinaryStream } from '@jukebox/binarystream'
-import { Packet } from '@jukebox/raknet'
 import assert from 'assert'
+
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+import { Packet } from '@jukebox/raknet'
 
 export abstract class DataPacket extends Packet {
   public constructor(id: number) {
     super(id)
   }
 
-  protected encodeHeader(stream: BinaryStream): void {
+  // public internalEncode(stream = new BinaryStream()): Buffer {
+  //  this.clean(stream)
+  //  return super.internalEncode(stream)
+  // }
+
+  protected encodeHeader(stream: WriteStream): void {
     stream.writeUnsignedVarInt(this.getId())
   }
 

@@ -1,4 +1,5 @@
-import { BinaryStream } from '@jukebox/binarystream'
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+
 import { FrameFlags } from './frame-flags'
 import { FrameReliability } from './frame-reliability'
 
@@ -14,7 +15,7 @@ export class Frame {
   public sequenceIndex: number
   // Only if ordered
   public orderedIndex: number
-  public orderChannel: number
+  public orderChannel = 0 // We don't support order channels
   // Only if fragmented
   public fragmentSize = 0
   // Refers to the ID of the fragmented packet
@@ -24,7 +25,7 @@ export class Frame {
 
   public content: Buffer
 
-  public streamEncode(stream: BinaryStream): void {
+  public streamEncode(stream: WriteStream): void {
     let flags = this.reliability << 5
     if (this.fragmentSize > 0) {
       flags |= FrameFlags.SPLIT
@@ -111,9 +112,9 @@ export class Frame {
   }
 
   public getByteSize(): number {
-    // 4 bytes -> seq number + flags
+    // 3 flags byte + bits length short (2 bytes)
     return (
-      4 +
+      3 +
       (this.isReliable() ? 3 : 0) +
       (this.isSequenced() ? 3 : 0) +
       (this.isOrdered() ? 4 : 0) +

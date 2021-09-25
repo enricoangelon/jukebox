@@ -1,29 +1,31 @@
-import { RangedRecord, Record, SingleRecord } from './record'
+import { assert } from 'console'
+import { RemoteInfo } from 'dgram'
 
-import { Acknowledgement } from './protocol/acknowledgement'
-import { BinaryStream } from '@jukebox/binarystream'
-import { ConnectedPing } from './protocol/connection/connected-ping'
-import { ConnectedPong } from './protocol/connection/connected-pong'
-import { ConnectionRequest } from './protocol/login/connection-request'
-import { ConnectionRequestAccepted } from './protocol/login/connection-request-accepted'
-import { Frame } from './protocol/frame'
-import { FrameFlags } from './protocol/frame-flags'
-import { FrameReliability } from './protocol/frame-reliability'
-import { FrameSetPacket } from './protocol/frame-set-packet'
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+import { Logger } from '@jukebox/logger'
+
 import { Identifiers } from './identifiers'
 import { Info } from './info'
-import { Logger } from '@jukebox/logger'
 import { NetEvents } from './net-events'
+import { Packet } from './packet'
+import { Acknowledgement } from './protocol/acknowledgement'
+import { ConnectedPing } from './protocol/connection/connected-ping'
+import { ConnectedPong } from './protocol/connection/connected-pong'
+import { IncompatibleProtocolVersion } from './protocol/connection/incompatible-protocol-version'
 import { NewIncomingConnection } from './protocol/connection/new-incoming-connection'
-import { NotAcknowledgement } from './protocol/not-acknowledgement'
 import { OpenConnectionReplyOne } from './protocol/connection/open-connection-reply-one'
 import { OpenConnectionReplyTwo } from './protocol/connection/open-connection-reply-two'
 import { OpenConnectionRequestOne } from './protocol/connection/open-connection-request-one'
 import { OpenConnectionRequestTwo } from './protocol/connection/open-connection-request-two'
-import { Packet } from './packet'
+import { Frame } from './protocol/frame'
+import { FrameFlags } from './protocol/frame-flags'
+import { FrameReliability } from './protocol/frame-reliability'
+import { FrameSetPacket } from './protocol/frame-set-packet'
+import { ConnectionRequest } from './protocol/login/connection-request'
+import { ConnectionRequestAccepted } from './protocol/login/connection-request-accepted'
+import { NotAcknowledgement } from './protocol/not-acknowledgement'
+import { RangedRecord, Record, SingleRecord } from './record'
 import { RakServer } from './server'
-import { RemoteInfo } from 'dgram'
-import { assert, time } from 'console'
 
 export class NetworkSession {
   private readonly socket: RakServer
@@ -47,11 +49,13 @@ export class NetworkSession {
   private outputSequenceNumber = 0
   // Holds the reliable index for reliable frame sets
   private outputReliableIndex = 0
+  // Holds the sequence index for the order channel 0
+  private outputSequenceIndex = 0
   // Holds the sequence number of lost packets
   private nackSequenceNumbers: Set<number> = new Set()
 
-  // Used by ordered reliable frame sets
-  private orderingIndexes: Map<number, number> = new Map()
+  // Used by ordered reliable frame sets (only for order channel 0)
+  private orderingIndex = 0
   // Input ordering queue
   private inputOrderIndex: Map<number, number> = new Map()
   private inputOrderingQueue: Map<number, Map<number, Frame>> = new Map()
@@ -62,86 +66,83 @@ export class NetworkSession {
   // fragmentID -> FragmentedFrame ( index -> buffer )
   private fragmentedFrames: Map<number, Map<number, Frame>> = new Map()
 
+  // The average of 5 times it takes connected ping to arrive
+  private pings: Array<number> = [0, 0, 0, 0, 0]
+
   public constructor(socket: RakServer, rinfo: RemoteInfo, logger: Logger) {
     this.logger = logger
     this.socket = socket
     this.rinfo = rinfo
-
-    this.socket.on(NetEvents.TICK, this.tick.bind(this))
   }
 
-  public tick(timestamp: number): void {
-    // Acknowledge recived packets to the other end
-    if (this.inputSequenceNumbers.size > 0) {
-      const records: Set<Record> = new Set()
-      const sequences = Array.from(this.inputSequenceNumbers).sort(
-        (a, b) => a - b
-      )
-
-      const deleteSeqFromInputQueue = (seqNum: number) => {
-        if (!this.inputSequenceNumbers.has(seqNum)) {
-          this.logger.debug(
-            `Cannot find sequnece number (${seqNum}) in input queue`
-          )
-          return
-        }
-        this.inputSequenceNumbers.delete(seqNum)
-      }
-
-      for (let i = 1, continuous = 0; i <= sequences.length; i++) {
-        const prevSeq = sequences[i - 1]
-        // In the last iteration sequences[i] will be undefined, but it does its job correctly
-        if (sequences[i] - prevSeq == 1) {
-          continuous++
-        } else {
-          if (continuous == 0) {
-            records.add(new SingleRecord(prevSeq))
-            deleteSeqFromInputQueue(prevSeq)
-          } else {
-            const start = sequences[i - 1] - continuous
-            records.add(new RangedRecord(start, prevSeq))
-
-            for (let j = start; j < prevSeq; j++) {
-              deleteSeqFromInputQueue(j)
-            }
-            continuous = 0
-          }
-        }
-      }
-
-      const ack = new Acknowledgement()
-      ack.records = records
-      this.sendPacket(ack)
+  public tick(): void {
+    // Timeout if we don't receive any packet after 10 seconds
+    if (Date.now() - this.receiveTimestamp >= 10_000) {
+      this.socket.removeSession(this)
+      this.logger.info(`[${this.getAddrToken()}] logged out due to timeout!`)
     }
 
-    // Not Acknowledge non received packets
+    // Acknowledge recived packets to the other end
+    if (this.inputSequenceNumbers.size > 0) {
+      const records = this.generateRecords(this.inputSequenceNumbers)
+      const ack = new Acknowledgement()
+      ack.records = records
+
+      const recordsByteSize: number = [...records]
+        .map(re => (re.isSingle() ? 4 : 7))
+        .reduce((tot, v) => tot + v, 0)
+      // Buffer size: HEADER (1) + 2 + records byte size
+      const writeStream = new WriteStream(
+        Buffer.allocUnsafe(3 + recordsByteSize)
+      )
+      const buffer = ack.internalEncode(writeStream)
+      RakServer.sendBuffer(buffer, this.rinfo)
+    }
+
+    // Not Acknowledge non received packets to the other end
     if (this.nackSequenceNumbers.size > 0) {
-      this.logger.debug('We miss packets, send a NACK')
-      if (this.nackSequenceNumbers.size == 1) {
-        // Single sequence number
-      } else {
-        // Ranged sequence numbers
-      }
+      const records = this.generateRecords(this.nackSequenceNumbers)
+      const nack = new NotAcknowledgement()
+      nack.records = records
+
+      const recordsByteSize: number = [...records]
+        .map(re => (re.isSingle() ? 4 : 7))
+        .reduce((tot, v) => tot + v, 0)
+      // Buffer size: HEADER (1) + 2 + records byte size
+      const writeStream = new WriteStream(
+        Buffer.allocUnsafe(3 + recordsByteSize)
+      )
+      const buffer = nack.internalEncode(writeStream)
+      RakServer.sendBuffer(buffer, this.rinfo)
     }
 
     // Send all queued frames and clear queue
     if (this.outputFramesQueue.size > 0) {
-      const frameSet = new FrameSetPacket()
-      frameSet.sequenceNumber = this.outputSequenceNumber++
-      const frames = Array.from(this.outputFramesQueue)
-      frameSet.frames = frames
-      this.logger.debug(
-        `Sent FrameSet with sequenceNumber=${frameSet.sequenceNumber} holding ${frameSet.frames.length} frame(s)`
-      )
-      this.sendFrameSet(frameSet)
-      // Delete sent frames from output queue
-      for (const frame of frames) {
-        this.outputFramesQueue.delete(frame)
-      }
+      this.sendOutputFrames()
+    }
+  }
+
+  private sendOutputFrames() {
+    const frameSet = new FrameSetPacket()
+    frameSet.sequenceNumber = this.outputSequenceNumber++
+    const frames = Array.from(this.outputFramesQueue)
+    frameSet.frames = frames
+    this.logger.debug(
+      `[${this.getAddrToken()}] Sent FrameSet with sequenceNumber=${
+        frameSet.sequenceNumber
+      } holding ${frameSet.frames.length} frame(s)`
+    )
+    this.sendFrameSet(frameSet)
+    // Delete sent frames from output queue
+    for (const frame of frames) {
+      this.outputFramesQueue.delete(frame)
     }
   }
 
   public async handle(stream: BinaryStream): Promise<void> {
+    // Used to timout the client if we don't receive new packets
+    this.receiveTimestamp = Date.now()
+
     if (!(await this.handleDatagram(stream))) {
       const packetId = stream.getBuffer().readUInt8(0)
       if (packetId & FrameFlags.ACK) {
@@ -156,9 +157,6 @@ export class NetworkSession {
   }
 
   private async handleDatagram(stream: BinaryStream): Promise<boolean> {
-    // Used to timout the client if we don't receive new packets
-    this.receiveTimestamp = Date.now()
-
     const packetId = stream.getBuffer().readUInt8(0)
     if (packetId == Identifiers.OPEN_CONNECTION_REQUEST_1) {
       await this.handleOpenConnectionRequestOne(stream)
@@ -167,7 +165,6 @@ export class NetworkSession {
       await this.handleOpenConnectionRequestTwo(stream)
       return true
     }
-
     return false
   }
 
@@ -181,7 +178,9 @@ export class NetworkSession {
     // Ignore the packet if we already received it
     if (this.inputSequenceNumbers.has(frameSetPacket.sequenceNumber)) {
       this.logger.debug(
-        `Discarded already received FrameSet with sequenceNumber=${frameSetPacket.sequenceNumber} from ${this.rinfo.address}:${this.rinfo.port}`
+        `[${this.getAddrToken()}] Discarded already received FrameSet with sequenceNumber=${
+          frameSetPacket.sequenceNumber
+        }`
       )
       return
     }
@@ -209,6 +208,7 @@ export class NetworkSession {
       this.nackSequenceNumbers.add(missingSequenceNumber)
     }
 
+    // Handle frames batched into framesets
     for (const frame of frameSetPacket.frames) {
       this.processFrame(frame)
     }
@@ -217,7 +217,9 @@ export class NetworkSession {
   private processFrame(frame: Frame): void {
     if (frame.isFragmented()) {
       this.logger.debug(
-        `Recived a fragmented Frame fragmentSize=${frame.fragmentSize}, fragmentID=${frame.fragmentID}, fragmentIndex=${frame.fragmentIndex} from ${this.rinfo.address}:${this.rinfo.port}`
+        `[${this.getAddrToken()}] Recived a fragmented Frame fragmentSize=${
+          frame.fragmentSize
+        }, fragmentID=${frame.fragmentID}, fragmentIndex=${frame.fragmentIndex}`
       )
       this.handleFragmentedFrame(frame)
       return
@@ -290,8 +292,18 @@ export class NetworkSession {
 
     switch (packetId) {
       case Identifiers.CONNECTED_PING:
+        const startDecodeMS = process.hrtime()
         const connectedPing = new ConnectedPing()
         connectedPing.internalDecode(stream)
+
+        const clientSendTime = Number(connectedPing.timestamp)
+        const serverCurrentTimestamp = Number(process.hrtime.bigint()) / 1e6
+        const endDecodeMS = process.hrtime(startDecodeMS)
+        const decodeMillis = endDecodeMS[1] * 1e-6
+
+        // To calculate the ping, i also removed the time the packet took to decode
+        this.pings.push(serverCurrentTimestamp - clientSendTime - decodeMillis)
+        this.pings.shift()
 
         const connectedPong = new ConnectedPong()
         connectedPong.clientTimestamp = connectedPing.timestamp
@@ -320,15 +332,18 @@ export class NetworkSession {
         break
       default:
         this.logger.debug(
-          `Unhandled packet with ID=${packetId.toString(16)} from ${
-            this.rinfo.address
-          }:${this.rinfo.port}`
+          `[${this.getAddrToken()}] Unhandled packet with ID=${packetId.toString(
+            16
+          )}`
         )
     }
   }
 
   private handleFragmentedFrame(frame: Frame) {
-    assert(frame.isFragmented(), 'Cannot reasseble a non fragmented packet')
+    assert(
+      frame.isFragmented(),
+      `[${this.getAddrToken()}] Cannot reasseble a non fragmented packet`
+    )
     const fragmentID = frame.fragmentID
     const fragmentIndex = frame.fragmentIndex
     if (!this.fragmentedFrames.has(fragmentID)) {
@@ -379,7 +394,9 @@ export class NetworkSession {
   ): void {
     const frame = new Frame()
     frame.reliability = reliability
-    frame.content = packet.internalEncode()
+    // Buffer size: mtu?!
+    const stream = new WriteStream(Buffer.allocUnsafe(1024 * 1024 * 2))
+    frame.content = packet.internalEncode(stream)
     this.sendImmediateFrame(frame)
   }
 
@@ -397,69 +414,65 @@ export class NetworkSession {
     packet: T,
     reliability = FrameReliability.UNRELIABLE
   ): void {
-    const buffer = packet.internalEncode()
+    const stream = new WriteStream(Buffer.allocUnsafe(1024 * 1024 * 2))
+    const buffer = packet.internalEncode(stream)
     this.sendQueuedBuffer(buffer, reliability)
   }
 
   private getFilledFrame(frame: Frame): Frame {
     if (frame.isReliable()) {
       frame.reliableIndex = this.outputReliableIndex++
-      if (frame.isOrdered()) {
-        const orderChannel = frame.orderChannel ?? 0
-        if (!this.orderingIndexes.has(orderChannel)) {
-          this.orderingIndexes.set(orderChannel, 0) // TODO: may result undefined
-          frame.orderedIndex = 0
-        } else {
-          const orderIndex = this.orderingIndexes.get(orderChannel)!
-          this.orderingIndexes.set(orderChannel, orderIndex + 1)
-          frame.orderedIndex = orderIndex + 1
-        }
+    }
+
+    if (frame.isOrdered()) {
+      if (frame.isSequenced()) {
+        frame.orderedIndex = this.orderingIndex // Sequenced packets don't increase the ordered channel index
+      } else {
+        frame.orderedIndex = this.orderingIndex++
       }
+    }
+
+    if (frame.isSequenced()) {
+      frame.sequenceIndex = this.outputSequenceIndex++
     }
     return frame
   }
 
-  private fragmentFrame(frame: Frame): Frame[] {
-    const fragments: Array<Frame> = []
-    const buffers: Map<number, Buffer> = new Map()
-    let index = 0,
-      splitIndex = 0
+  private async fragmentFrame(frame: Frame, mtu: number): Promise<Frame[]> {
+    return new Promise(resolve => {
+      const fragments: Array<Frame> = []
+      const buffers: Map<number, Buffer> = new Map()
+      let index = 0,
+        splitIndex = 0
 
-    while (index < frame.content.byteLength) {
-      // Push format: [chunk index: int, chunk: buffer]
-      buffers.set(splitIndex++, frame.content.slice(index, (index += this.mtu)))
-    }
-
-    for (const [index, buffer] of buffers) {
-      const newFrame = new Frame()
-      newFrame.fragmentID = this.fragmentID
-      newFrame.fragmentSize = buffers.size
-      newFrame.fragmentIndex = index
-      newFrame.reliability = frame.reliability
-      newFrame.content = buffer
-
-      if (newFrame.isReliable()) {
-        // By logic we already increased by one the index before splitting
-        // and after splitting we are increasing again skipping a reliable index
-        // this hack will reuse the prevous index in order to avoid skipping
-        if (index == 0) {
-          newFrame.reliableIndex = frame.reliableIndex
-        } else {
-          newFrame.reliableIndex = this.outputReliableIndex++
-        }
-        if (newFrame.isOrdered()) {
-          newFrame.orderChannel = frame.orderChannel
-          newFrame.orderedIndex = frame.orderedIndex
-        }
+      // While is thread blocking, so that's why i put this in a promise
+      while (index < frame.content.byteLength) {
+        // Push format: [chunk index: int, chunk: buffer]
+        buffers.set(splitIndex++, frame.content.slice(index, (index += mtu)))
       }
 
-      fragments.push(newFrame)
-    }
+      const fragmentId = this.fragmentID++ % 65536 // Overflow
+      for (const [index, buffer] of buffers) {
+        const newFrame = new Frame()
+        newFrame.fragmentID = fragmentId
+        newFrame.fragmentSize = buffers.size
+        newFrame.fragmentIndex = index
+        newFrame.reliability = frame.reliability
+        newFrame.content = buffer
 
-    // Increase the splitID for the next split packet
-    this.fragmentID++
+        if (newFrame.isReliable()) {
+          newFrame.reliableIndex = this.outputReliableIndex++
+        }
 
-    return fragments
+        newFrame.sequenceIndex = frame.sequenceIndex
+        newFrame.orderChannel = frame.orderChannel
+        newFrame.orderedIndex = frame.orderedIndex
+
+        fragments.push(newFrame)
+      }
+
+      resolve(fragments)
+    })
   }
 
   private sendQueuedFrame(frame: Frame): void {
@@ -467,9 +480,18 @@ export class NetworkSession {
 
     // Split the frame in multiple frames if its bytelength
     // length exceeds the maximumx transfer unit limit
-    if (filledFrame.getByteSize() > this.mtu) {
-      this.fragmentFrame(filledFrame).forEach(frame => {
-        this.outputFramesQueue.add(frame)
+    const maxMtu = this.mtu - 60 // Padding for some RakNet headers
+    if (filledFrame.getByteSize() > maxMtu) {
+      this.fragmentFrame(filledFrame, maxMtu).then(frames => {
+        for (const fragmentedFrame of frames) {
+          const framesLen = [...this.outputFramesQueue]
+            .map(frame => frame.getByteSize())
+            .reduce((accum, len) => accum + len, 0)
+          if (framesLen + fragmentedFrame.getByteSize() > this.mtu) {
+            this.sendOutputFrames()
+          }
+          this.outputFramesQueue.add(fragmentedFrame)
+        }
       })
     } else {
       this.outputFramesQueue.add(frame)
@@ -478,13 +500,15 @@ export class NetworkSession {
 
   private sendImmediateFrame(frame: Frame): void {
     const filledFrame = this.getFilledFrame(frame)
-
-    if (filledFrame.getByteSize() > this.mtu) {
-      this.fragmentFrame(frame).forEach(fragment => {
-        const frameSet = new FrameSetPacket()
-        frameSet.sequenceNumber = this.outputSequenceNumber++
-        frameSet.frames.push(fragment)
-        this.sendFrameSet(frameSet)
+    const maxMtu = this.mtu - 60 // Padding for some RakNet headers
+    if (filledFrame.getByteSize() > maxMtu) {
+      this.fragmentFrame(filledFrame, maxMtu).then(frames => {
+        for (const fragmentedFrame of frames) {
+          const frameSet = new FrameSetPacket()
+          frameSet.sequenceNumber = this.outputSequenceNumber++
+          frameSet.frames.push(fragmentedFrame)
+          this.sendFrameSet(frameSet)
+        }
       })
     } else {
       const frameSet = new FrameSetPacket()
@@ -499,13 +523,13 @@ export class NetworkSession {
       const packet = this.outputFrameSets.get(sequenceNumber)!
       this.outputFrameSets.delete(sequenceNumber)
       // Skip queues when resending a lost packet
-      this.sendInstantPacket(packet)
+      this.sendInstantPacket(packet, FrameReliability.RELIABLE_ORDERED)
       this.logger.debug(
-        `Sent lost packet with sequenceNumber=${sequenceNumber} to ${this.rinfo.address}:${this.rinfo.port}`
+        `[${this.getAddrToken()}] Sent lost packet with sequenceNumber=${sequenceNumber}`
       )
     } else {
       this.logger.debug(
-        `Cannot find lost frame set with sequenceNumber=${sequenceNumber}`
+        `[${this.getAddrToken()}] Cannot find lost frame set with sequenceNumber=${sequenceNumber}`
       )
     }
   }
@@ -513,6 +537,7 @@ export class NetworkSession {
   private handleAcknowledgement(stream: BinaryStream): void {
     const ack = new Acknowledgement()
     ack.internalDecode(stream)
+
     for (const record of ack.records) {
       // Here we receive the sequence numbers of
       // packets that the other end succesfully received
@@ -522,7 +547,7 @@ export class NetworkSession {
         if (this.outputFrameSets.has(seqNum)) {
           this.outputFrameSets.delete(seqNum)
           this.logger.debug(
-            `Removed sent packet from backup queue with seqNum=${seqNum}`
+            `[${this.getAddrToken()}] Removed sent packet from backup queue with seqNum=${seqNum}`
           )
         }
       } else {
@@ -532,11 +557,12 @@ export class NetworkSession {
         for (let i = startSeqNum; i <= endSeqNum; i++) {
           if (this.outputFrameSets.has(i)) {
             this.outputFrameSets.delete(i)
-            this.logger.debug(
-              `Removed sent packet from backup queue with seqNum=${i}`
-            )
           }
         }
+
+        this.logger.debug(
+          `[${this.getAddrToken()}] Removed sent packets from backup queue with startSeq=${startSeqNum} endSeq=${endSeqNum}`
+        )
       }
     }
   }
@@ -545,7 +571,7 @@ export class NetworkSession {
     const nack = new NotAcknowledgement()
     nack.internalDecode(stream)
 
-    nack.records.forEach(record => {
+    for (const record of nack.records) {
       if (record.isSingle()) {
         this.sendLostFrameSet((record as SingleRecord).getSeqNumber())
       } else {
@@ -555,7 +581,7 @@ export class NetworkSession {
           this.sendLostFrameSet(i)
         }
       }
-    })
+    }
   }
 
   private async handleOpenConnectionRequestOne(
@@ -565,7 +591,7 @@ export class NetworkSession {
     openConnectionRequestOne.internalDecode(stream)
 
     if (openConnectionRequestOne.remoteProtocol != Info.PROTOCOL) {
-      // TODO: this.sendIncompatibleProtocolVersion()
+      this.sendIncompatibleProtocolVersion()
       return
     }
 
@@ -574,7 +600,10 @@ export class NetworkSession {
       openConnectionRequestOne.maximumTransferUnit
     openConnectionReplyOne.serverGuid = this.socket.getGuid()
 
-    this.sendPacket(openConnectionReplyOne)
+    // Buffer size: HEADER (1) + MAGIC (16) + 8 + 1 + 2
+    const writeStream = new WriteStream(Buffer.allocUnsafe(28))
+    const buffer = openConnectionReplyOne.internalEncode(writeStream)
+    RakServer.sendBuffer(buffer, this.rinfo)
   }
 
   private async handleOpenConnectionRequestTwo(
@@ -591,9 +620,69 @@ export class NetworkSession {
 
     this.mtu = openConnectionRequestTwo.maximumTransferUnit
     this.logger.debug(
-      `Maximum Transfer Unit agreed to be: ${this.mtu} with ${this.rinfo.address}:${this.rinfo.port}`
+      `[${this.getAddrToken()}] Maximum Transfer Unit agreed to be: ${this.mtu}`
     )
-    this.sendPacket(openConnectionReplyTwo)
+
+    // Buffer size: HEADER (1) + MAGIC (16) + 8 + IPV4 (6) + 2 + 1
+    const writeStream = new WriteStream(Buffer.allocUnsafe(34))
+    const buffer = openConnectionReplyTwo.internalEncode(writeStream)
+    RakServer.sendBuffer(buffer, this.rinfo)
+  }
+
+  private sendIncompatibleProtocolVersion(): void {
+    const incompatibleProtocolVersion = new IncompatibleProtocolVersion()
+    incompatibleProtocolVersion.serverProtocol = Info.PROTOCOL
+    incompatibleProtocolVersion.serverGUID = this.socket.getGuid()
+
+    // Buffer size: HEADER (1) + MAGIC (16) + 8 + 1
+    const writeStream = new WriteStream(Buffer.allocUnsafe(26))
+    const buffer = incompatibleProtocolVersion.internalEncode(writeStream)
+    RakServer.sendBuffer(buffer, this.rinfo)
+  }
+
+  /**
+   * This function will basically generate the records to be sent in (N)ACKs
+   * by just requiring the set containing sequence numbers.
+   *
+   * @param sequenceNumbers A set containing sequence numbers
+   */
+  private generateRecords(sequenceNumbers: Set<number>): Set<Record> {
+    const records: Set<Record> = new Set()
+    const sequences = Array.from(sequenceNumbers).sort((a, b) => a - b)
+
+    const deleteSeqFromInputQueue = (seqNum: number) => {
+      if (!sequenceNumbers.has(seqNum)) {
+        this.logger.debug(
+          `[${this.getAddrToken()}] Cannot find sequnece number (${seqNum}) in input queue`
+        )
+        return
+      }
+      sequenceNumbers.delete(seqNum)
+    }
+
+    for (let i = 1, continuous = 0; i <= sequences.length; i++) {
+      const prevSeq = sequences[i - 1]
+      // In the last iteration sequences[i] will be undefined, but it does its job correctly
+      // It's a bug that works :=D
+      if (sequences[i] - prevSeq == 1) {
+        continuous++
+      } else {
+        if (continuous == 0) {
+          records.add(new SingleRecord(prevSeq))
+          deleteSeqFromInputQueue(prevSeq)
+        } else {
+          const start = sequences[i - 1] - continuous
+          records.add(new RangedRecord(start, prevSeq))
+
+          for (let j = start; j < prevSeq; j++) {
+            deleteSeqFromInputQueue(j)
+          }
+          continuous = 0
+        }
+      }
+    }
+
+    return records
   }
 
   private sendFrameSet(frameSet: FrameSetPacket): void {
@@ -604,6 +693,14 @@ export class NetworkSession {
 
   public sendPacket<T extends Packet>(packet: T): void {
     RakServer.sendPacket(packet, this.rinfo)
+  }
+
+  public getPing(): number {
+    return Math.trunc(this.pings.reduce((a, b) => a + b) / this.pings.length)
+  }
+
+  public getAddrToken(): string {
+    return `${this.rinfo.address}:${this.rinfo.port}`
   }
 
   public getRemoteInfo(): RemoteInfo {

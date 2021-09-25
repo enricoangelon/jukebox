@@ -1,4 +1,5 @@
 import assert from 'assert'
+
 import { BinaryStream } from '../../../binarystream/lib'
 
 export class UUID {
@@ -34,6 +35,19 @@ export class UUID {
     )
   }
 
+  public toString(): string {
+    const hex = this.toBinary().toString('hex')
+
+    // Xxxxxxxx-xxxx-Mxxx-Nxxx-xxxxxxxxxxxx 8-4-4-4-12
+    const parts = []
+    parts.push(hex.slice(0, 8))
+    parts.push(hex.slice(8, 8 + 4))
+    parts.push(hex.slice(12, 12 + 4))
+    parts.push(hex.slice(16, 16 + 4))
+    parts.push(hex.slice(20, 20 + 12))
+    return parts.join('-')
+  }
+
   public static fromBinary(uuid: Buffer, version = 4): UUID {
     assert(uuid.byteLength == 16, 'UUID must have 16 bytes')
     const stream = new BinaryStream(uuid)
@@ -44,5 +58,14 @@ export class UUID {
       stream.readInt(),
       version
     )
+  }
+
+  public toBinary(): Buffer {
+    const stream = new BinaryStream()
+    stream.writeInt(this.parts[0])
+    stream.writeInt(this.parts[1])
+    stream.writeInt(this.parts[2])
+    stream.writeInt(this.parts[3])
+    return stream.getBuffer()
   }
 }

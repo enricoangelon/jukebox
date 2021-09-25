@@ -1,6 +1,7 @@
-import { BinaryStream } from '@jukebox/binarystream'
-import { DataPacket } from './internal/data-packet'
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+
 import { Protocol } from '../protocol'
+import { DataPacket } from './internal/data-packet'
 
 export class McpeLevelChunk extends DataPacket {
   public chunkX: number
@@ -14,7 +15,7 @@ export class McpeLevelChunk extends DataPacket {
     super(Protocol.LEVEL_CHUNK)
   }
 
-  public encode(stream: BinaryStream): void {
+  public encode(stream: WriteStream): void {
     stream.writeVarInt(this.chunkX)
     stream.writeVarInt(this.chunkZ)
     stream.writeUnsignedVarInt(this.subChunkCount)

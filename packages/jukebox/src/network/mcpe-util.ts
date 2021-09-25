@@ -1,11 +1,21 @@
+import { writeFileSync } from 'fs'
+import { inspect } from 'util'
+
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+
+import { Endianess, NBTTagCompound, NBTWriter } from '../../../nbt/lib'
+import { Attribute } from '../entity/attribute/attribute'
+import { AttributeContainer } from '../entity/attribute/container'
+import { MetadataContainer } from '../entity/metadata/container'
+import { Metadata } from '../entity/metadata/metadata'
+import { MetadataType } from '../entity/metadata/type'
+import { Vector3 } from '../math/vector3'
 import { BehaviorPackInfo } from '../resourcepack/behavior-pack-info'
-import { BinaryStream } from '@jukebox/binarystream'
 import { ResourcePackInfo } from '../resourcepack/resource-pack-info'
 import { ResourcePackStack } from '../resourcepack/resource-pack-stack'
-import { Vector3 } from '../math/vector3'
-import { UUID } from '../utils/uuid'
-import { Skin } from '../utils/skin/skin'
 import { SkinImage } from '../utils/skin/image'
+import { Skin } from '../utils/skin/skin'
+import { UUID } from '../utils/uuid'
 
 export class McpeUtil {
   public static readString(stream: BinaryStream): string {
@@ -13,7 +23,7 @@ export class McpeUtil {
     return stream.read(length).toString('utf-8')
   }
 
-  public static writeString(stream: BinaryStream, str: string): void {
+  public static writeString(stream: WriteStream, str: string): void {
     const buffer = Buffer.from(str, 'utf-8')
     stream.writeUnsignedVarInt(buffer.byteLength)
     stream.write(buffer)
@@ -26,7 +36,7 @@ export class McpeUtil {
   }
 
   public static writeLELengthASCIIString(
-    stream: BinaryStream,
+    stream: WriteStream,
     str: string
   ): void {
     const buf = Buffer.from(str, 'ascii')
@@ -41,7 +51,7 @@ export class McpeUtil {
     return new Vector3(x, y, z)
   }
 
-  public static writeVector3(stream: BinaryStream, vector3: Vector3): void {
+  public static writeVector3(stream: WriteStream, vector3: Vector3): void {
     stream.writeFloatLE(vector3.getX())
     stream.writeFloatLE(vector3.getY())
     stream.writeFloatLE(vector3.getZ())
@@ -54,7 +64,7 @@ export class McpeUtil {
     return new Vector3(x, y, z)
   }
 
-  public static writeBlockCoords(stream: BinaryStream, vector3: Vector3): void {
+  public static writeBlockCoords(stream: WriteStream, vector3: Vector3): void {
     stream.writeVarInt(vector3.getX())
     stream.writeUnsignedVarInt(vector3.getY())
     stream.writeVarInt(vector3.getZ())
@@ -82,7 +92,7 @@ export class McpeUtil {
   }
 
   public static writeResourcePackInfo(
-    stream: BinaryStream,
+    stream: WriteStream,
     info: ResourcePackInfo
   ): void {
     McpeUtil.writeString(stream, info.uuid)
@@ -115,7 +125,7 @@ export class McpeUtil {
   }
 
   public static writeBehaviorPackInfo(
-    stream: BinaryStream,
+    stream: WriteStream,
     info: BehaviorPackInfo
   ): void {
     McpeUtil.writeString(stream, info.uuid)
@@ -135,7 +145,7 @@ export class McpeUtil {
   }
 
   public static writeResourcePackStack(
-    stream: BinaryStream,
+    stream: WriteStream,
     stack: ResourcePackStack
   ): void {
     McpeUtil.writeString(stream, stack.uuid)
@@ -143,7 +153,7 @@ export class McpeUtil {
     McpeUtil.writeString(stream, stack.subPackName)
   }
 
-  public static writeUUID(stream: BinaryStream, uuid: UUID): void {
+  public static writeUUID(stream: WriteStream, uuid: UUID): void {
     stream.writeIntLE(uuid.getParts()[1])
     stream.writeIntLE(uuid.getParts()[0])
     stream.writeIntLE(uuid.getParts()[3])
@@ -158,16 +168,16 @@ export class McpeUtil {
     return new UUID(part0, part1, part2, part3)
   }
 
-  public static writeSkinImage(stream: BinaryStream, image: SkinImage): void {
-    stream.writeFloatLE(image.getWidth())
-    stream.writeFloatLE(image.getHeight())
+  public static writeSkinImage(stream: WriteStream, image: SkinImage): void {
+    stream.writeIntLE(image.getWidth())
+    stream.writeIntLE(image.getHeight())
     stream.writeUnsignedVarInt(image.getData().byteLength)
     stream.write(image.getData())
   }
 
   // TODO: readSkinImage
 
-  public static writeSkin(stream: BinaryStream, skin: Skin): void {
+  public static writeSkin(stream: WriteStream, skin: Skin): void {
     McpeUtil.writeString(stream, skin.getIdentifier())
     McpeUtil.writeString(stream, skin.getPlayFabId())
     McpeUtil.writeString(stream, skin.getResourcePatch())
@@ -213,4 +223,83 @@ export class McpeUtil {
   }
 
   // TODO: readSkin
+
+  public static writeMetadata(
+    stream: WriteStream,
+    metaContainer: MetadataContainer
+  ): void {
+    stream.writeUnsignedVarInt(metaContainer.getMetadataHolder().size)
+    for (const [indexId, metaValue] of metaContainer.getMetadataHolder()) {
+      const type = metaValue.getTypeId()
+      stream.writeUnsignedVarInt(indexId)
+      stream.writeUnsignedVarInt(type)
+
+      switch (type) {
+        case MetadataType.BYTE:
+          stream.writeByte((metaValue as Metadata<number>).getValue())
+          break
+        case MetadataType.SHORT:
+          stream.writeShortLE((metaValue as Metadata<number>).getValue())
+          break
+        case MetadataType.INT:
+          stream.writeVarInt((metaValue as Metadata<number>).getValue())
+          break
+        case MetadataType.FLOAT:
+          stream.writeFloatLE((metaValue as Metadata<number>).getValue())
+          break
+        case MetadataType.STRING:
+          McpeUtil.writeString(
+            stream,
+            (metaValue as Metadata<string>).getValue()
+          )
+          break
+        case MetadataType.NBT:
+          // TODO
+          const writer = new NBTWriter(
+            (stream as any) as BinaryStream,
+            Endianess.LITTLE_ENDIAN
+          )
+          writer.setUseVarint(true)
+          try {
+            writer.writeCompound(
+              (metaValue as Metadata<NBTTagCompound>).getValue()
+            )
+          } catch (error) {
+            throw new Error(`Failed to write NBT in metadata: ${error}`)
+          }
+          break
+        case MetadataType.POSITION:
+          const position = (metaValue as Metadata<Vector3>).getValue()
+          stream.writeVarInt(position.getX())
+          stream.writeVarInt(position.getY())
+          stream.writeVarInt(position.getZ())
+          break
+        case MetadataType.LONG:
+          stream.writeVarLong((metaValue as Metadata<bigint>).getValue())
+          break
+        case MetadataType.VECTOR:
+          const vector = (metaValue as Metadata<Vector3>).getValue()
+          stream.writeFloatLE(vector.getX())
+          stream.writeFloatLE(vector.getY())
+          stream.writeFloatLE(vector.getZ())
+          break
+        default:
+          throw new Error(`Invalid metadata type=${type}`)
+      }
+    }
+  }
+
+  public static writeAttributes(
+    stream: WriteStream,
+    attributes: AttributeContainer
+  ): void {
+    stream.writeUnsignedVarInt(attributes.size)
+    for (const [identifier, attribute] of attributes) {
+      stream.writeFloatLE(attribute.getMinValue())
+      stream.writeFloatLE(attribute.getMaxValue())
+      stream.writeFloatLE(attribute.getValue())
+      stream.writeFloatLE(attribute.getDefaultValue())
+      McpeUtil.writeString(stream, identifier)
+    }
+  }
 }

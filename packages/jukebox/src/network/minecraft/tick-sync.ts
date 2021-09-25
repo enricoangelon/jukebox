@@ -1,4 +1,5 @@
-import { BinaryStream } from '@jukebox/binarystream'
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+
 import { Protocol } from '../protocol'
 import { DataPacket } from './internal/data-packet'
 
@@ -10,7 +11,7 @@ export class McpeTickSync extends DataPacket {
     super(Protocol.TICK_SYNC)
   }
 
-  public encode(stream: BinaryStream): void {
+  public encode(stream: WriteStream): void {
     stream.writeLongLE(this.requestTimestamp)
     stream.writeLongLE(this.responseTimestamp)
   }

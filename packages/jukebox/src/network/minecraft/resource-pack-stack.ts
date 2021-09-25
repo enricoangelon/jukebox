@@ -1,4 +1,5 @@
-import { BinaryStream } from '@jukebox/binarystream'
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+
 import { ResourcePackStack } from '../../resourcepack/resource-pack-stack'
 import { McpeUtil } from '../mcpe-util'
 import { Protocol } from '../protocol'
@@ -15,7 +16,7 @@ export class McpeResourcePackStack extends DataPacket {
     super(Protocol.RESOURCE_PACK_STACK)
   }
 
-  public encode(stream: BinaryStream): void {
+  public encode(stream: WriteStream): void {
     stream.writeBoolean(this.forceAccept)
     stream.writeUnsignedVarInt(this.behaviorPacks.length)
     for (const behaviorPack of this.behaviorPacks) {
@@ -25,7 +26,7 @@ export class McpeResourcePackStack extends DataPacket {
     for (const resourcePack of this.resourcePacks) {
       McpeUtil.writeResourcePackStack(stream, resourcePack)
     }
-    McpeUtil.writeString(stream, Protocol.MC_VERSION)
+    McpeUtil.writeString(stream, '*') // BDS actually sends this char, so we do the same
     stream.writeUnsignedIntLE(this.experiments.length)
     stream.writeBoolean(this.alreadyEnabledExperiments)
   }

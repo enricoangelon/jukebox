@@ -1,4 +1,5 @@
 import { BinaryStream } from '@jukebox/binarystream'
+
 import { McpeUtil } from '../mcpe-util'
 import { Protocol } from '../protocol'
 import { DataPacket } from './internal/data-packet'

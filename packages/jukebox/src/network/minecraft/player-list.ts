@@ -1,37 +1,39 @@
-import { BinaryStream } from '@jukebox/binarystream'
-import { DataPacket } from './internal/data-packet'
-import { Protocol } from '../protocol'
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+
+import { Skin } from '../../utils/skin/skin'
+import { UUID } from '../../utils/uuid'
 import { McpeUtil } from '../mcpe-util'
-import { EntityPlayer } from '../../entity/entity-player'
+import { Protocol } from '../protocol'
+import { DataPacket } from './internal/data-packet'
 
 export class McpePlayerList extends DataPacket {
-  public playerEntries: Array<EntityPlayer>
+  public listEntries: Array<PlayerListEntry>
   public action: PlayerListAction
 
   public constructor() {
     super(Protocol.PLAYER_LIST)
   }
 
-  public encode(stream: BinaryStream): void {
+  public encode(stream: WriteStream): void {
     stream.writeByte(this.action)
-    stream.writeUnsignedVarInt(this.playerEntries.length)
-    for (const player of this.playerEntries) {
-      McpeUtil.writeUUID(stream, player.getUUID())
+    stream.writeUnsignedVarInt(this.listEntries.length)
+    for (const entry of this.listEntries) {
+      McpeUtil.writeUUID(stream, entry.uuid)
       if (this.action == PlayerListAction.ADD) {
-        stream.writeVarLong(player.getRuntimeId())
-        McpeUtil.writeString(stream, player.getUsername())
-        McpeUtil.writeString(stream, '') // TODO: xbl user id
-        McpeUtil.writeString(stream, '') // TODO: platformChatId
-        stream.writeIntLE(-1) // TODO: build platform
-        McpeUtil.writeSkin(stream, player.getSkin())
-        stream.writeBoolean(false) // TODO: is teacher
-        stream.writeBoolean(false) // TODO: is host
+        stream.writeVarLong(entry.uniqueEntityId)
+        McpeUtil.writeString(stream, entry.name)
+        McpeUtil.writeString(stream, entry.xuid)
+        McpeUtil.writeString(stream, entry.platformChatid)
+        stream.writeIntLE(entry.buildPlatform)
+        McpeUtil.writeSkin(stream, entry.skin)
+        stream.writeBoolean(entry.teacher)
+        stream.writeBoolean(entry.host)
       }
     }
 
     if (this.action == PlayerListAction.ADD) {
-      for (let i = 0, len = this.playerEntries.length; i < len; i++) {
-        stream.writeBoolean(false) // TODO: only persona skins
+      for (let i = 0; i < this.listEntries.length; i++) {
+        stream.writeBoolean(true) // TODO: only persona skins
       }
     }
   }
@@ -44,4 +46,39 @@ export class McpePlayerList extends DataPacket {
 export enum PlayerListAction {
   ADD,
   REMOVE,
+}
+
+// TODO: i don't like this :(
+export class PlayerListEntry {
+  public readonly uuid: UUID
+  public readonly uniqueEntityId: bigint
+  public readonly name: string
+  public readonly xuid: string
+  public readonly platformChatid: string
+  public readonly buildPlatform: number
+  public readonly skin: Skin
+  public readonly teacher: boolean
+  public readonly host: boolean
+
+  public constructor(
+    uuid: UUID,
+    uniqueEntityId: bigint,
+    name: string,
+    skin: Skin,
+    xuid: string = '',
+    platformChatId = '',
+    buildPlatform = -1,
+    teacher = false,
+    host = false
+  ) {
+    this.uuid = uuid
+    this.uniqueEntityId = uniqueEntityId
+    this.name = name
+    this.xuid = xuid
+    this.platformChatid = platformChatId
+    this.buildPlatform = buildPlatform
+    this.skin = skin
+    this.teacher = teacher
+    this.host = host
+  }
 }

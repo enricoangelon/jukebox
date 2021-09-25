@@ -1,7 +1,7 @@
-import { DataPacket } from './internal/data-packet'
 import { Protocol } from '../protocol'
+import { DataPacket } from './internal/data-packet'
 
-export class ClientToServerHandshake extends DataPacket {
+export class McpeClientToServerHandshake extends DataPacket {
   public constructor() {
     super(Protocol.CLIENT_TO_SERVER_HANDSHAKE)
   }

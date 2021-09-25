@@ -1,27 +1,34 @@
 import { Logger } from './logger'
 
 export class DevLogger implements Logger {
-  public info() {
+  public info(): void {
     console.log(arguments)
   }
-  public debug() {
+
+  public debug(): void {
     console.log(arguments)
   }
-  public fatal() {
+
+  public fatal(): void {
     console.log(arguments)
   }
-  public log() {
+
+  public log(): void {
     console.log(arguments)
   }
-  public error() {
+
+  public error(): void {
     console.log(arguments)
   }
-  public trace() {
+
+  public trace(): void {
     console.log(arguments)
   }
-  public warn() {
+
+  public warn(): void {
     console.log(arguments)
   }
+
   public namespace() {
     return new DevLogger()
   }

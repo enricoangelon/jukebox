@@ -1,8 +1,10 @@
-import { BinaryStream } from '@jukebox/binarystream'
+import { RemoteInfo } from 'dgram'
+
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+
 import { Identifiers } from '../../identifiers'
 import { NetUtils } from '../../net-utils'
 import { Packet } from '../../packet'
-import { RemoteInfo } from 'dgram'
 
 export class OpenConnectionReplyTwo extends Packet {
   public magic: Buffer
@@ -15,7 +17,7 @@ export class OpenConnectionReplyTwo extends Packet {
     super(Identifiers.OPEN_CONNECTION_REPLY_2)
   }
 
-  public encode(stream: BinaryStream): void {
+  public encode(stream: WriteStream): void {
     NetUtils.writeMagic(stream)
     stream.writeLong(this.serverGuid)
     NetUtils.writeAddress(stream, this.clientAddress)

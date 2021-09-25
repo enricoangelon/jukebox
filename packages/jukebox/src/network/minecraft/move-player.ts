@@ -1,8 +1,9 @@
-import { BinaryStream } from '@jukebox/binarystream'
-import { DataPacket } from './internal/data-packet'
-import { Protocol } from '../protocol'
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+
 import { Vector3 } from '../../math/vector3'
 import { McpeUtil } from '../mcpe-util'
+import { Protocol } from '../protocol'
+import { DataPacket } from './internal/data-packet'
 
 export class McpeMovePlayer extends DataPacket {
   public runtimeEntityId: bigint
@@ -20,7 +21,7 @@ export class McpeMovePlayer extends DataPacket {
     super(Protocol.MOVE_PLAYER)
   }
 
-  public encode(stream: BinaryStream): void {
+  public encode(stream: WriteStream): void {
     stream.writeUnsignedVarLong(this.runtimeEntityId)
     McpeUtil.writeVector3(stream, this.position)
     McpeUtil.writeVector3(stream, this.rotation)

@@ -1,6 +1,7 @@
 import { BinaryStream } from '@jukebox/binarystream'
-import { Endianess } from './endianess'
+
 import { NBTDefinitions } from './definitions'
+import { Endianess } from './endianess'
 import { NBTTag } from './tag'
 
 export class NBTStreamReader {

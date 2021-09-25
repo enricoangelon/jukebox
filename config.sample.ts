@@ -1,21 +1,12 @@
-import { DevLogger } from '@jukebox/logger'
-import { FlatWorld } from '@jukebox/flat-world'
-import { Config } from '@jukebox/core'
+import { DevLogger, MainLogger } from '@jukebox/logger'
 
-export default <Config>{
-  worlds: [
-    /* index 0 in the array will be the default world */
-    new FlatWorld(/*{
-      name: 'world',
-      surfaceBlock: 'GRASS',
-    }*/),
-  ],
+export default {
   defaultWorld: 'world',
-  logger: new DevLogger(/*{ saveToFile: false }*/),
+  logger: new MainLogger(/*{ saveToFile: false }*/),
   lang: 'en_US',
   filesystem: null, // Can optionally be in memory
   plugins: [],
-  encryption: true,
+  encryption: false,
   server: {
     port: 19132,
     motd: 'A jukebox minecraft bedrock server',

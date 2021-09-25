@@ -1,6 +1,7 @@
-import { BinaryStream } from '@jukebox/binarystream'
-import { DataPacket } from './internal/data-packet'
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+
 import { Protocol } from '../protocol'
+import { DataPacket } from './internal/data-packet'
 
 export class McpePlayStatus extends DataPacket {
   public status: number
@@ -9,7 +10,7 @@ export class McpePlayStatus extends DataPacket {
     super(Protocol.PLAY_STATUS)
   }
 
-  public encode(stream: BinaryStream): void {
+  public encode(stream: WriteStream): void {
     stream.writeInt(this.status)
   }
 

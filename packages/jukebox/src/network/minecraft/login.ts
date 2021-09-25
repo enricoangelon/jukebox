@@ -1,7 +1,8 @@
 import { BinaryStream } from '@jukebox/binarystream'
-import { DataPacket } from './internal/data-packet'
+
 import { McpeUtil } from '../mcpe-util'
 import { Protocol } from '../protocol'
+import { DataPacket } from './internal/data-packet'
 
 export class McpeLogin extends DataPacket {
   public gameProtocol: number

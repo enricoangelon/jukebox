@@ -1,13 +1,15 @@
+import { readFileSync } from 'fs'
+
 import { BinaryStream } from '@jukebox/binarystream'
+
 import { Endianess } from './endianess'
 import { NBTReader } from './reader'
 import { NBTTag } from './tag'
 import { NBTWriter } from './writer'
-import { readFileSync } from 'fs'
 
 export class NBTTagCompound {
   private name: string | null
-  public readonly children: Map<string, any> = new Map()
+  private readonly children: Map<string, any> = new Map()
 
   public static readFromFile(
     path: string,

@@ -1,8 +1,9 @@
-import { BinaryStream } from '@jukebox/binarystream'
-import { DataPacket } from './internal/data-packet'
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+
+import { Vector3 } from '../../math/vector3'
 import { McpeUtil } from '../mcpe-util'
 import { Protocol } from '../protocol'
-import { Vector3 } from '../../math/vector3'
+import { DataPacket } from './internal/data-packet'
 
 export class McpeStartGame extends DataPacket {
   public entityId: bigint
@@ -80,15 +81,15 @@ export class McpeStartGame extends DataPacket {
     super(Protocol.START_GAME)
   }
 
-  public encode(stream: BinaryStream): void {
+  public encode(stream: WriteStream): void {
     stream.writeVarLong(this.entityId)
     stream.writeUnsignedVarLong(this.runtimeEntityId)
 
     stream.writeVarInt(this.playerGamemode)
     McpeUtil.writeVector3(stream, this.playerSpawnVector)
 
-    stream.writeFloat(this.pitch)
-    stream.writeFloat(this.yaw)
+    stream.writeFloatLE(this.pitch)
+    stream.writeFloatLE(this.yaw)
 
     stream.writeVarInt(this.seed)
     stream.writeShortLE(this.biomeType)

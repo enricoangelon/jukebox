@@ -17,7 +17,6 @@ export class Flat extends WorldGenerator {
         chunk.setRuntimeId(x, y, z, grassId)
       }
     }
-
     return chunk
   }
 }

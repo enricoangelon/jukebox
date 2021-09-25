@@ -1,7 +1,9 @@
-import { BinaryStream } from '@jukebox/binarystream'
-import { Info } from './info'
-import { RemoteInfo } from 'dgram'
 import { assert } from 'console'
+import { RemoteInfo } from 'dgram'
+
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+
+import { Info } from './info'
 
 export class NetUtils {
   public static readString(stream: BinaryStream): string {
@@ -10,7 +12,7 @@ export class NetUtils {
     return data.toString('utf-8')
   }
 
-  public static writeString(stream: BinaryStream, v: string): void {
+  public static writeString(stream: WriteStream, v: string): void {
     const data = Buffer.from(v, 'utf-8')
     stream.writeUnsignedShort(data.length)
     stream.write(data)
@@ -35,7 +37,7 @@ export class NetUtils {
     }
   }
 
-  public static writeAddress(stream: BinaryStream, rinfo: RemoteInfo): void {
+  public static writeAddress(stream: WriteStream, rinfo: RemoteInfo): void {
     assert(['IPv4', 'IPv6'].includes(rinfo.family), {
       family: rinfo.family,
       error: 'Unknown address family',
@@ -63,7 +65,7 @@ export class NetUtils {
     return magic
   }
 
-  public static writeMagic(stream: BinaryStream): void {
+  public static writeMagic(stream: WriteStream): void {
     stream.write(Info.MAGIC)
   }
 }

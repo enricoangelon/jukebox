@@ -1,7 +1,8 @@
-import { BinaryStream } from '@jukebox/binarystream'
-import { DataPacket } from './internal/data-packet'
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+
 import { McpeUtil } from '../mcpe-util'
 import { Protocol } from '../protocol'
+import { DataPacket } from './internal/data-packet'
 
 export class McpeText extends DataPacket {
   public type: number
@@ -18,7 +19,7 @@ export class McpeText extends DataPacket {
     super(Protocol.TEXT)
   }
 
-  public encode(stream: BinaryStream): void {
+  public encode(stream: WriteStream): void {
     stream.writeByte(this.type)
     stream.writeBoolean(this.needsTranslation)
 

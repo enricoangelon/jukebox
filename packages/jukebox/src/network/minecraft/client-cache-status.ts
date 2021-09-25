@@ -1,8 +1,9 @@
 import { BinaryStream } from '@jukebox/binarystream'
-import { DataPacket } from './internal/data-packet'
-import { Protocol } from '../protocol'
 
-export class ClientCacheStatus extends DataPacket {
+import { Protocol } from '../protocol'
+import { DataPacket } from './internal/data-packet'
+
+export class McpeClientCacheStatus extends DataPacket {
   public supported: boolean
 
   public constructor() {

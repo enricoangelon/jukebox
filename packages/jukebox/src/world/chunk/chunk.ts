@@ -1,7 +1,8 @@
-import { BinaryStream } from '@jukebox/binarystream'
-import { ChunkSlice } from './chunk-slice'
-import { McpeLevelChunk } from '../../network/minecraft/level-chunk'
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+
 import { WrapperPacket } from '../../network/minecraft/internal/wrapper-packet'
+import { McpeLevelChunk } from '../../network/minecraft/level-chunk'
+import { ChunkSlice } from './chunk-slice'
 
 export class Chunk {
   private static readonly MAX_SLICES = 16
@@ -34,28 +35,30 @@ export class Chunk {
     this.getSlice(y >> 4).setRuntimeId(x & 0x0f, y & 0x0f, z & 0x0f, id)
   }
 
-  public getWrapper(): WrapperPacket {
-    let topEmpty = this.getTopEmpty()
+  public async getWrapper(): Promise<WrapperPacket> {
+    return new Promise(resolve => {
+      let topEmpty = this.getTopEmpty()
 
-    const stream = new BinaryStream()
-    for (let ci = 0; ci < topEmpty; ci++) {
-      this.getSlice(ci).streamEncode(stream)
-    }
+      const stream = new WriteStream(Buffer.alloc((topEmpty + 2) * 4096))
+      for (let ci = 0; ci < topEmpty; ci++) {
+        this.getSlice(ci).streamEncode(stream)
+      }
 
-    stream.write(this.biomes)
-    stream.writeByte(0) // border blocks size
-    stream.writeUnsignedVarInt(0) // extra data
+      stream.write(this.biomes)
+      stream.writeByte(0) // border blocks size
+      stream.writeUnsignedVarInt(0) // extra data
 
-    const levelChunk = new McpeLevelChunk()
-    levelChunk.cacheEnabled = false
-    levelChunk.chunkX = this.x
-    levelChunk.chunkZ = this.z
-    levelChunk.subChunkCount = topEmpty
-    levelChunk.data = stream.getBuffer()
+      const levelChunk = new McpeLevelChunk()
+      levelChunk.cacheEnabled = false
+      levelChunk.chunkX = this.x
+      levelChunk.chunkZ = this.z
+      levelChunk.subChunkCount = topEmpty
+      levelChunk.data = stream.getBuffer()
 
-    const wrapper = new WrapperPacket()
-    wrapper.addPacket(levelChunk)
-    return wrapper
+      const wrapper = new WrapperPacket()
+      wrapper.addPacket(levelChunk)
+      resolve(wrapper)
+    })
   }
 
   public getTopEmpty(): number {

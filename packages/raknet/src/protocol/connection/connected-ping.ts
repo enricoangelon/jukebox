@@ -1,4 +1,5 @@
-import { BinaryStream } from '@jukebox/binarystream'
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+
 import { Identifiers } from '../../identifiers'
 import { Packet } from '../../packet'
 
@@ -9,7 +10,7 @@ export class ConnectedPing extends Packet {
     super(Identifiers.CONNECTED_PING)
   }
 
-  public encode(stream: BinaryStream): void {
+  public encode(stream: WriteStream): void {
     stream.writeLong(this.timestamp)
   }
 

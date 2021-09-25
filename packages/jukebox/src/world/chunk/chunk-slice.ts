@@ -1,6 +1,8 @@
-import { BinaryStream } from '@jukebox/binarystream'
-import { BlockManager } from '../../block/block-manager'
 import { assert } from 'console'
+
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+
+import { BlockManager } from '../../block/block-manager'
 
 export class ChunkSlice {
   private static readonly DATA_SIZE = 4096
@@ -9,20 +11,20 @@ export class ChunkSlice {
   private readonly blocks: number[] = new Array(ChunkSlice.DATA_SIZE).fill(0)
 
   public getRuntimeId(x: number, y: number, z: number): number {
-    ChunkSlice.checkBounds(x, y, z)
+    // ChunkSlice.checkBounds(x, y, z)
     const paletteIndex = this.blocks[ChunkSlice.getIndex(x, y, z)]
     return this.palette[paletteIndex]
   }
 
   public setRuntimeId(x: number, y: number, z: number, id: number): void {
-    ChunkSlice.checkBounds(x, y, z)
+    // ChunkSlice.checkBounds(x, y, z)
     if (!this.palette.includes(id)) {
       this.palette.push(id)
     }
     this.blocks[ChunkSlice.getIndex(x, y, z)] = this.palette.indexOf(id)
   }
 
-  public streamEncode(stream: BinaryStream): void {
+  public streamEncode(stream: WriteStream): void {
     stream.writeByte(8) // sub chunk version
     stream.writeByte(1) // storages count
 

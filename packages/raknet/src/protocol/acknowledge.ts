@@ -1,7 +1,7 @@
-import { RangedRecord, Record, SingleRecord } from '../record'
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
 
-import { BinaryStream } from '@jukebox/binarystream'
 import { Packet } from '../packet'
+import { RangedRecord, Record, SingleRecord } from '../record'
 
 export class Acknowledge extends Packet {
   public records: Set<Record> = new Set()
@@ -10,7 +10,7 @@ export class Acknowledge extends Packet {
     super(identifier)
   }
 
-  public encode(stream: BinaryStream): void {
+  public encode(stream: WriteStream): void {
     stream.writeUnsignedShort(this.records.size)
     for (const record of this.records) {
       // May be tricky but i like this implementation

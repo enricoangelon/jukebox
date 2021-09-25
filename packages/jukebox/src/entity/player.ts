@@ -1,16 +1,20 @@
-import { Entity } from './entity'
-import { EntityType } from './entity-type'
+import { Jukebox } from '../jukebox'
 import { PlayerConnection } from '../network/player-connection'
 import { PlayerLoginData } from '../network/player-login-data'
-import { World } from '../world/world'
-import { CoordinateUtils } from '../world/coordinate-utils'
-import { Jukebox } from '../jukebox'
 import { Skin } from '../utils/skin/skin'
 import { UUID } from '../utils/uuid'
+import { CoordinateUtils } from '../world/coordinate-utils'
+import { World } from '../world/world'
+import { Attribute } from './attribute/attribute'
+import { EntityFlag } from './flag'
+import { EntityLiving } from './living'
+import { MetadataFlags } from './metadata/flags'
+import { EntityType } from './type'
 
-export class EntityPlayer extends Entity {
+export class EntityPlayer extends EntityLiving {
   private connection: PlayerConnection
 
+  private xuid: string
   private uuid: UUID
   private username: string
   private skin: Skin
@@ -21,20 +25,38 @@ export class EntityPlayer extends Entity {
   private loadedChunks: Set<string> = new Set()
 
   public constructor(world: World, connection: PlayerConnection) {
-    // TODO: proper worlds
     super(EntityType.PLAYER, world)
     this.connection = connection
 
-    Jukebox.getServer().on('tick', timestamp => this.tick(timestamp))
+    // Set player-only metadata
+    this.metadata.setByte(MetadataFlags.PLAYER_FLAGS, 0)
+    this.metadata.setShort(MetadataFlags.AIR, 400)
+    this.metadata.setShort(MetadataFlags.MAX_AIRDATA_MAX_AIR, 400)
+    this.metadata.setDataFlag(MetadataFlags.INDEX, EntityFlag.BREATHING, true)
   }
 
-  public tick(timestamp: number): void {
-    this.connection.process(timestamp)
-    super.tick(timestamp)
+  protected initCustomAttributes(): void {
+    // TODO: attributes manipulation API
+    this.attributes.set('minecraft:luck', new Attribute(-1024.0, 1024.0, 0.0))
+    this.attributes.set('minecraft:player.saturation', new Attribute(0, 20, 20))
+    this.attributes.set(
+      'minecraft:player.exhaustion',
+      new Attribute(0, 4, 0, 0.45000002)
+    )
+    this.attributes.set('minecraft:player.hunger', new Attribute(0, 20, 20))
+    this.attributes.set('minecraft:player.level', new Attribute(0, 24791, 0))
+    this.attributes.set('minecraft:player.experience', new Attribute(0, 1, 0))
+  }
+
+  public tick(currentTick: number): void {
+    this.connection.process()
+    super.tick(currentTick)
 
     if (this.getConnection().isInitialized()) {
-      this.sendNewChunks(this.viewRadius)
+      // this.sendNewChunks(this.viewRadius)
     }
+
+    // TODO: event
   }
 
   public async sendNewChunks(radius: number): Promise<void> {
@@ -82,18 +104,18 @@ export class EntityPlayer extends Entity {
     })
 
     for (const [newX, newZ] of chunksToSend) {
-      this.getWorld()
-        .getChunk(newX, newZ)
-        .then(chunk => {
-          const encodedPos = CoordinateUtils.chunkHash(newX, newZ)
-          if (!this.loadingChunks.has(encodedPos)) {
-            return
-          }
+      ;(async () => {
+        const chunk = await this.getWorld().getChunk(newX, newZ)
+        const encodedPos = CoordinateUtils.chunkHash(newX, newZ)
+        if (!this.loadingChunks.has(encodedPos)) {
+          return
+        }
 
-          this.getConnection().sendImmediateWrapper(chunk.getWrapper())
-          this.loadedChunks.add(encodedPos)
-          this.loadingChunks.delete(encodedPos)
-        })
+        const wrapper = await chunk.getWrapper()
+        this.getConnection().sendImmediateWrapper(wrapper)
+        this.loadedChunks.add(encodedPos)
+        this.loadingChunks.delete(encodedPos)
+      })()
     }
 
     let unloaded = false
@@ -120,6 +142,7 @@ export class EntityPlayer extends Entity {
   }
 
   public setLoginData(data: PlayerLoginData): void {
+    this.xuid = data.XUID
     this.uuid = UUID.fromString(data.identity, 4)
     this.skin = Skin.fromJWT(data)
     this.setUsername(data.displayName)
@@ -135,14 +158,20 @@ export class EntityPlayer extends Entity {
     this.getConnection().sendChunkRadiusUpdated(radius)
   }
 
+  public getXUID(): string {
+    return this.xuid
+  }
+
   public getUUID(): UUID {
     return this.uuid
   }
 
   public setUsername(username: string): void {
     this.username = username
-    this.connection.sendUpdatedPlayerList()
+    // TODO: broken this.connection.sendUpdatedPlayerList()
   }
+
+  public close(): void {}
 
   public getUsername(): string {
     return this.username

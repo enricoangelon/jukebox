@@ -1,4 +1,5 @@
-import { BinaryStream } from '@jukebox/binarystream'
+import { BinaryStream, WriteStream } from '@jukebox/binarystream'
+
 import { Identifiers } from '../../identifiers'
 import { NetUtils } from '../../net-utils'
 import { Packet } from '../../packet'
@@ -13,7 +14,7 @@ export class OpenConnectionRequestOne extends Packet {
     super(Identifiers.OPEN_CONNECTION_REQUEST_1)
   }
 
-  public encode(stream: BinaryStream): void {
+  public encode(stream: WriteStream): void {
     NetUtils.writeMagic(stream)
     stream.writeByte(this.remoteProtocol)
     const length = this.maximumTransferUnit - stream.getBuffer().byteLength + 28
