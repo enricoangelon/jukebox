@@ -1,6 +1,6 @@
 export enum Protocol {
-  MC_VERSION = '1.17.10',
-  MC_PROTOCOL = 448,
+  MC_VERSION = '1.17.30',
+  MC_PROTOCOL = 465,
 
   UNKNOWN = 0x00,
   LOGIN = 0x01,

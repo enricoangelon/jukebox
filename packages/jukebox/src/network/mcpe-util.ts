@@ -192,9 +192,7 @@ export class McpeUtil {
     McpeUtil.writeSkinImage(stream, skin.getCape().getImage())
     McpeUtil.writeString(stream, skin.getGeometry())
     McpeUtil.writeString(stream, skin.getAnimationData())
-    stream.writeBoolean(skin.isPremium())
-    stream.writeBoolean(skin.isPersona())
-    stream.writeBoolean(skin.isCapeOnClassicSkin())
+    McpeUtil.writeString(stream, '') // TODO: geometry data engine version
     McpeUtil.writeString(stream, skin.getCape().getIndetifier())
     McpeUtil.writeString(stream, skin.getFullId())
     McpeUtil.writeString(stream, skin.getArmSize())
@@ -220,6 +218,11 @@ export class McpeUtil {
       stream.writeIntLE(0)
       stream.writeIntLE(0)
     }
+
+    stream.writeBoolean(skin.isPremium())
+    stream.writeBoolean(skin.isPersona())
+    stream.writeBoolean(skin.isCapeOnClassicSkin())
+    stream.writeBoolean(true) // TODO: is primary user
   }
 
   // TODO: readSkin
