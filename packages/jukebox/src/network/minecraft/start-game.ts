@@ -147,6 +147,11 @@ export class McpeStartGame extends DataPacket {
     stream.writeIntLE(this.limitedWorldWidth)
 
     stream.writeBoolean(this.hasNewNether)
+
+    // TODOs
+    McpeUtil.writeString(stream, '')
+    McpeUtil.writeString(stream, '')
+
     stream.writeBoolean(this.forceExperimentalGameplay)
 
     McpeUtil.writeString(stream, this.levelId)

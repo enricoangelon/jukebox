@@ -1,6 +1,7 @@
-import { deflateSync, inflate, inflateSync } from 'fflate'
+// import { deflateSync, inflate, inflateSync } from 'fflate'
+// import { deflateRaw } from 'pako'
 import { deflateRaw } from 'pako'
-import { deflateRaw as defr } from 'zlib'
+import { deflateRawSync, inflateRawSync } from 'zlib'
 
 import { BinaryStream, WriteStream } from '@jukebox/binarystream'
 import { Identifiers, Packet } from '@jukebox/raknet'
@@ -9,18 +10,25 @@ import { DataPacket } from './data-packet'
 
 export class WrapperPacket extends Packet {
   private content = new BinaryStream()
-  // TODO: private compressionLevel = 7
+  private compressionLevel = 7
 
   public constructor() {
     super(Identifiers.GAME_PACKET)
   }
 
   public encode(stream: WriteStream): void {
-    stream.writeByteArray(deflateSync(this.content.getBuffer(), { level: 7 }))
+    stream.write(
+      deflateRawSync(this.content.getBuffer(), { level: this.compressionLevel })
+    )
   }
 
   public decode(stream: BinaryStream): void {
-    this.content.write(inflateSync(stream.getRemaining()))
+    this.content.write(
+      inflateRawSync(stream.getRemaining(), {
+        level: this.compressionLevel,
+        maxOutputLength: 1024 * 1024 * 2,
+      })
+    )
   }
 
   private async asyncEncode(stream: WriteStream): Promise<void> {
@@ -28,15 +36,15 @@ export class WrapperPacket extends Packet {
     stream.writeByteArray(compressed)
   }
 
-  private async asyncDecode(stream: BinaryStream): Promise<void> {
-    const decompressed: Uint8Array = await new Promise((resolve, reject) => {
-      inflate(stream.getRemaining(), { consume: true }, (err, data) => {
-        if (err) reject(err)
-        resolve(data)
-      })
-    })
-    this.content.write(decompressed)
-  }
+  // private async asyncDecode(stream: BinaryStream): Promise<void> {
+  //  const decompressed: Uint8Array = await new Promise((resolve, reject) => {
+  //    inflate(stream.getRemaining(), { consume: true }, (err, data) => {
+  //      if (err) reject(err)
+  //      resolve(data)
+  //    })
+  //  })
+  //  this.content.write(decompressed)
+  // }
 
   public async internalAsyncEncode(
     stream = new WriteStream(Buffer.allocUnsafe(1024 * 1024 * 2))
@@ -47,11 +55,11 @@ export class WrapperPacket extends Packet {
     return stream.getBuffer()
   }
 
-  public async internalAsyncDecode(stream: BinaryStream): Promise<Buffer[]> {
-    this.decodeHeader(stream)
-    await this.asyncDecode(stream)
-    return this.getPackets()
-  }
+  // public async internalAsyncDecode(stream: BinaryStream): Promise<Buffer[]> {
+  //  this.decodeHeader(stream)
+  //  await this.asyncDecode(stream)
+  //  return this.getPackets()
+  // }
 
   public addPacket(dataPacket: DataPacket): void {
     const buffer = dataPacket.internalEncode(

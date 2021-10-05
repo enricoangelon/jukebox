@@ -2,6 +2,7 @@ import assert from 'assert'
 import { createHash, createPublicKey, randomBytes } from 'crypto'
 import { decode, sign, verify } from 'jsonwebtoken'
 import PromiseQueue from 'promise-queue'
+import { Worker } from 'worker_threads'
 
 import { BinaryStream, WriteStream } from '@jukebox/binarystream'
 import { NetworkSession } from '@jukebox/raknet'
@@ -86,6 +87,8 @@ export class PlayerConnection {
 
   private sendPacketFn: <T extends DataPacket>(packet: T) => void
 
+  private decodeBatchThread: Worker
+
   public constructor(session: NetworkSession) {
     this.networkSession = session
     const world = Jukebox.getWorld()
@@ -94,6 +97,15 @@ export class PlayerConnection {
     // Used to reference when unsubscribing the event
     this.sendPacketFn = this.sendImmediateDataPacket.bind(this)
     Jukebox.getServer().on('global_packet', this.sendPacketFn)
+
+    this.decodeBatchThread = new Worker(
+      __dirname + '../../network/batch-decode-thread.js'
+    )
+    this.decodeBatchThread.on('message', (msg: Array<Uint8Array>) =>
+      msg.forEach(array => {
+        this.handle(Buffer.from(array))
+      })
+    )
   }
 
   public process(): void {
@@ -204,11 +216,11 @@ export class PlayerConnection {
   /** INTERNAL PROTOCOL */
 
   private addWrapperToDecodingQueue(stream: BinaryStream): void {
-    const wrapper = new WrapperPacket()
-    this.wrapperDecodingQueue
-      .add(() => wrapper.internalAsyncDecode(stream))
-      .then(buffers => buffers.forEach(this.handle.bind(this)))
-      .catch(Jukebox.getLogger().error)
+    this.decodeBatchThread.postMessage(stream)
+    // this.wrapperDecodingQueue
+    //  .add(() => promise)
+    //  .then(buffers => buffers.forEach((byteArray) => this.handle(Buffer.from(byteArray))))
+    //  .catch(Jukebox.getLogger().error)
   }
 
   public handleDecrypted(buffer: Buffer): void {
